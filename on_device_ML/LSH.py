@@ -105,7 +105,6 @@ def main(name,set_lsh_function):# 0 for naive random projection and 1 for pool t
         loss_init = np.sum(hinge_loss)
         loss_0 = 0
         init = predict
-        j = 1
         print(loss_init)
         while loss_0 != loss_init:
             loss_0 = loss_init

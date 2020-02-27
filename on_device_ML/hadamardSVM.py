@@ -123,8 +123,9 @@ def main(name ):
     x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S))
     clf = LinearSVC()
     clf.fit(x_value, y)
-    print(clf.score(x_value, y))
+    print('linear train',clf.score(x_value, y))
     W_fcP = np.asmatrix(-np.ones((T * d, class_number)))
+    print(W_fcP.shape)
     n_number, f_num = np.shape(x)
     FLAGS.BATCHSIZE = n_number
     d = 2 ** math.ceil(np.log2(f_num))
@@ -148,7 +149,7 @@ def main(name ):
     FLAGS.BATCHSIZE = n_number
     start = time.time()
     x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S))
-    print(clf.score(x_value, y))
+    print('linear predict',clf.score(x_value, y))
     print(time.time() - start, 'linear svm')
 
 
