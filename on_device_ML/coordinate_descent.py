@@ -40,7 +40,7 @@ import numpy as np
 from scipy.stats import chi
 import sklearn
 from scipy._lib._util import _asarray_validated
-
+from sklearn.utils import check_array, check_random_state
 
 def get_data(name):
     if FLAGS.d_openml != None:
@@ -70,24 +70,18 @@ def hadamard(d,f_num,batch,G,B,PI_value,S):
     x_ = np.pad(x_, ((0,0),(0, d - f_num)), 'constant', constant_values=(0, 0))  # x.shape [batch,d]
     x_ = np.tile(x_, (1, T))
     x_i = np.multiply(x_, S)
-    x_ = x_i.reshape(FLAGS.BATCHSIZE, T, d)
+    x_ = x_i.reshape(FLAGS.BATCHSIZE*T, d)
     h = 1
     for i in range(x_.shape[0]):
-        for j in range(T):
-            ffht.fht(x_[i,j])
+        ffht.fht(x_[i])
     x_transformed = np.multiply(x_.reshape(FLAGS.BATCHSIZE, d * T), G)
-    x_transformed = np.reshape(x_transformed, (FLAGS.BATCHSIZE, T, d))
-    # x_permutation = x_transformed[:, :, PI_value]
-    # x_ = x_permutation
-    x_ = x_transformed
-    h = 1
+    x_ = np.reshape(x_transformed, (FLAGS.BATCHSIZE*T, d))
     for i in range(x_.shape[0]):
-        for j in range(T):
-            ffht.fht(x_[i, j])
+        ffht.fht(x_[i])
     x_ = x_.reshape(FLAGS.BATCHSIZE, T * d)
     x_value = np.multiply(x_, B)
     x_value = np.sign(x_value)
-    # print(x_value)
+    # #print(x_value)
     return x_value
 
 
@@ -117,137 +111,158 @@ def main(name ):
     read data and parameter initialize for the hadamard transform
     '''
     x_train, y_train, x_test, y_test= get_data(name)
-    x,y = x_train,y_train
-    n_number, f_num = np.shape(x)
-    d = 2 ** math.ceil(np.log2(f_num))
-    T = FLAGS.T
-    G = np.random.randn(T * d)
-    B = np.random.uniform(-1, 1, T * d)
-    B[B > 0] = 1
-    B[B < 0] = -1
-    PI_value = np.random.permutation(d)
-    G_fro = G.reshape(T, d)
-    s_i = chi.rvs(d, size=(T, d))
-    S = np.multiply(s_i, np.array(np.linalg.norm(G_fro, axis=1) ** (-0.5)).reshape(T, -1))
-    S = S.reshape(1, -1)
-    FLAGS.BATCHSIZE = n_number
+    acc_linear = np.zeros(3)
+    acc_binary = np.zeros(3)
+    acc_random = np.zeros(3)
+    for iter in range(3):
+        x,y = x_train,y_train
+        n_number, f_num = np.shape(x)
+        d = 2 ** math.ceil(np.log2(f_num))
+        T = FLAGS.T
+        # rng =
+        G = np.random.randn(T * d)
+        B = np.random.uniform(-1, 1, T * d)
+        B[B > 0] = 1
+        B[B < 0] = -1
+        PI_value = np.random.permutation(d)
+        G_fro = G.reshape(T, d)
+        s_i = chi.rvs(d, size=(T, d))
+        S = np.multiply(s_i, np.array(np.linalg.norm(G_fro, axis=1) ** (-0.5)).reshape(T, -1))
+        S = S.reshape(1, -1)
+        FLAGS.BATCHSIZE = n_number
 
-    ff_transform = Fastfood(n_components=d)
-    '''
-    Start to processing the label
-    '''
-    class_number = len(np.unique(y))
-    if FLAGS.d_openml != None:
+        ff_transform = Fastfood(n_components=d*T,tradeoff_mem_accuracy="mem")
         '''
-        lable convert from str to int in openml dataset
+        Start to processing the label
         '''
-        y_0 = np.zeros((n_number, 1))
-        for i in range(class_number):
-            y_temp = np.where(y[:] != '%d' % i, -1, 1)
-            y_0 = np.hstack((y_0, np.mat(y_temp).T))
-        y_temp = y_0[:, 1:]
-    else:
-        '''
-        for date from libsvm dataset both binary classification and multi-classification problem
-        '''
-        if class_number == 2:
-            y_temp = np.array(np.where(y[:] != 1, -1, 1).reshape(n_number, 1))
-            class_number -= 1
-        else:
+        class_number = len(np.unique(y))
+        if FLAGS.d_openml != None:
+            '''
+            lable convert from str to int in openml dataset
+            '''
             y_0 = np.zeros((n_number, 1))
-            y = y - 1
             for i in range(class_number):
-                y_temp = np.where(y[:] != i, -1, 1).reshape(n_number, 1)
-                y_0 = np.hstack((y_0, y_temp))
+                y_temp = np.where(y[:] != '%d' % i, -1, 1)
+                y_0 = np.hstack((y_0, np.mat(y_temp).T))
             y_temp = y_0[:, 1:]
-
-    print('Training Linear SVM')
-    x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S))
-    # x_value = ff_transform.fit(x)
-    clf = LinearSVC()
-    clf.fit(x_value, y)
-    print('train acc', clf.score(x_value, y))
-
-    print('Training coordinate descent initiate from result of linear svm')
-    W_fcP = clf.coef_
-
-    W_fcP = np.asmatrix(np.sign(W_fcP.reshape(-1, class_number)))
-
-    W_fcP = optimization(x_value, y_temp, W_fcP, class_number)
-    if class_number != 1:
-        predict = np.argmax(np.array(np.dot(x_value, W_fcP)), axis=1)
-        y_lable = np.argmax(y_temp, axis=1)
-        acc = accuracy_score(np.array(y_lable), np.array(predict))
-        print('train', acc)
-    else:
-        predict = np.array(np.dot(x_value, W_fcP))
-        acc = accuracy_score(np.sign(y_temp), np.sign(predict))
-        print('train', acc)
-
-    print('Training coordinate descent initiate from result of random initialize')
-    W_fcP_random = np.asmatrix(np.sign(np.random.random((T*d,class_number))))
-    W_fcP_random = optimization(x_value, y_temp, W_fcP_random, class_number)
-    if class_number != 1:
-        predict = np.argmax(np.array(np.dot(x_value, W_fcP_random)), axis=1)
-        y_lable = np.argmax(y_temp, axis=1)
-        acc = accuracy_score(np.array(y_lable), np.array(predict))
-        print('train', acc)
-    else:
-        predict = np.array(np.dot(x_value, W_fcP_random))
-        acc = accuracy_score(np.sign(y_temp), np.sign(predict))
-        print('train', acc)
-
-
-
-    x, y = x_test, y_test
-    n_number, f_num = np.shape(x)
-    if FLAGS.d_openml != None:
-        '''
-        lable convert from str to int in openml dataset
-        '''
-        y_0 = np.zeros((n_number, 1))
-        for i in range(class_number):
-            y_temp = np.where(y[:] != '%d' % i, -1, 1)
-            y_0 = np.hstack((y_0, np.mat(y_temp).T))
-        y_temp = y_0[:, 1:]
-    else:
-        if class_number == 1:
-            y_temp = np.array(np.where(y[:] != 1, -1, 1).reshape(n_number, 1))
         else:
+            '''
+            for date from libsvm dataset both binary classification and multi-classification problem
+            '''
+            if class_number == 2:
+                y_temp = np.array(np.where(y[:] != 1, -1, 1).reshape(n_number, 1))
+                class_number -= 1
+            else:
+                y_0 = np.zeros((n_number, 1))
+                y = y - 1
+                for i in range(class_number):
+                    y_temp = np.where(y[:] != i, -1, 1).reshape(n_number, 1)
+                    y_0 = np.hstack((y_0, y_temp))
+                y_temp = y_0[:, 1:]
+
+        #print('Training Linear SVM')
+        x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S))
+        # pars = ff_transform.fit(x)
+        # x_value = np.asmatrix(np.sign(pars.transform(x)))
+        # #print(x_value.shape)
+        clf = LinearSVC()
+        clf.fit(x_value, y)
+        #print('train acc', clf.score(x_value, y))
+
+        #print('Training coordinate descent initiate from result of linear svm')
+        W_fcP = clf.coef_
+
+        W_fcP = np.asmatrix(np.sign(W_fcP.reshape(-1, class_number)))
+
+        W_fcP = optimization(x_value, y_temp, W_fcP, class_number)
+        if class_number != 1:
+            predict = np.argmax(np.array(np.dot(x_value, W_fcP)), axis=1)
+            y_lable = np.argmax(y_temp, axis=1)
+            acc = accuracy_score(np.array(y_lable), np.array(predict))
+            # acc_binary[iter] = acc
+            #print('train', acc)
+        else:
+            predict = np.array(np.dot(x_value, W_fcP))
+            acc = accuracy_score(np.sign(y_temp), np.sign(predict))
+            acc_binary[iter] = acc
+            #print('train', acc)
+
+        #print('Training coordinate descent initiate from result of random initialize')
+        W_fcP_random = np.asmatrix(np.sign(np.random.random((T*d,class_number))))
+        W_fcP_random = optimization(x_value, y_temp, W_fcP_random, class_number)
+        if class_number != 1:
+            predict = np.argmax(np.array(np.dot(x_value, W_fcP_random)), axis=1)
+            y_lable = np.argmax(y_temp, axis=1)
+            acc = accuracy_score(np.array(y_lable), np.array(predict))
+            #print('train', acc)
+            # acc_random[iter] = acc
+        else:
+            predict = np.array(np.dot(x_value, W_fcP_random))
+            acc = accuracy_score(np.sign(y_temp), np.sign(predict))
+            #print('train', acc)
+            # acc_random[iter] = acc
+
+        x, y = x_test, y_test
+        n_number, f_num = np.shape(x)
+        if FLAGS.d_openml != None:
+            '''
+            lable convert from str to int in openml dataset
+            '''
             y_0 = np.zeros((n_number, 1))
-            y = y - 1
             for i in range(class_number):
-                y_temp = np.where(y[:] != i, -1, 1).reshape(n_number, 1)
-                y_0 = np.hstack((y_0, y_temp))
+                y_temp = np.where(y[:] != '%d' % i, -1, 1)
+                y_0 = np.hstack((y_0, np.mat(y_temp).T))
             y_temp = y_0[:, 1:]
-    n_number, f_num = np.shape(x)
-    FLAGS.BATCHSIZE = n_number
-    start = time.time()
-    x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S))
-    time_of_transform = time.time()-start
-    start= time.time()
-    print('linear predict', clf.score(x_value, y))
-    print('linear svm time', time_of_transform+time.time() - start)
-    if class_number != 1:
-        predict = np.argmax(np.array(np.dot(x_value, W_fcP)), axis=1)
-        y_lable = np.argmax(y_temp, axis=1)
-        acc = accuracy_score(np.array(y_lable), np.array(predict))
-        print( 'test',acc)
-    else:
-        predict = np.array(np.dot(x_value, W_fcP))
-        acc = accuracy_score(np.sign(y_temp), np.sign(predict))
-        print('test', acc)
-    print('test time',time_of_transform+time.time() - start)
-    if class_number != 1:
-        predict = np.argmax(np.array(np.dot(x_value, W_fcP_random)), axis=1)
-        y_lable = np.argmax(y_temp, axis=1)
-        acc = accuracy_score(np.array(y_lable), np.array(predict))
-        print( 'test random initial',acc)
-    else:
-        predict = np.array(np.dot(x_value, W_fcP_random))
-        acc = accuracy_score(np.sign(y_temp), np.sign(predict))
-        print('test random initial', acc)
-    print(' random initialtest time',time_of_transform+time.time() - start)
+        else:
+            if class_number == 1:
+                y_temp = np.array(np.where(y[:] != 1, -1, 1).reshape(n_number, 1))
+            else:
+                y_0 = np.zeros((n_number, 1))
+                y = y - 1
+                for i in range(class_number):
+                    y_temp = np.where(y[:] != i, -1, 1).reshape(n_number, 1)
+                    y_0 = np.hstack((y_0, y_temp))
+                y_temp = y_0[:, 1:]
+        n_number, f_num = np.shape(x)
+        FLAGS.BATCHSIZE = n_number
+        start = time.time()
+        x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S))
+        # x_value = np.asmatrix(np.sign(ff_transform.transform(x)))
+        time_of_transform = time.time()-start
+        start= time.time()
+        acc_linear[iter] = clf.score(x_value, y)
+        #print('linear predict', clf.score(x_value, y))
+        #print('linear svm time', time_of_transform+time.time() - start)
+        if class_number != 1:
+            predict = np.argmax(np.array(np.dot(x_value, W_fcP)), axis=1)
+            y_lable = np.argmax(y_temp, axis=1)
+            acc = accuracy_score(np.array(y_lable), np.array(predict))
+            acc_binary[iter] = acc
+            #print( 'test',acc)
+        else:
+            predict = np.array(np.dot(x_value, W_fcP))
+            acc = accuracy_score(np.sign(y_temp), np.sign(predict))
+            acc_binary[iter] = acc
+            #print('test', acc)
+        #print('test time',time_of_transform+time.time() - start)
+        '''
+        
+        '''
+        if class_number != 1:
+            predict = np.argmax(np.array(np.dot(x_value, W_fcP_random)), axis=1)
+            y_lable = np.argmax(y_temp, axis=1)
+            acc = accuracy_score(np.array(y_lable), np.array(predict))
+            acc_random[iter] = acc
+            #print( 'test random initial',acc)
+        else:
+            predict = np.array(np.dot(x_value, W_fcP_random))
+            acc = accuracy_score(np.sign(y_temp), np.sign(predict))
+            acc_random[iter] = acc
+        #print('test random initial', acc)
+    #print(' random initialtest time',time_of_transform+time.time() - start)
+    print(np.mean(acc_linear),np.mean(acc_binary),np.mean(acc_random))
+    print(acc_linear,acc_binary,acc_random)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
