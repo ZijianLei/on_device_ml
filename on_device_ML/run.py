@@ -59,7 +59,7 @@ def hadamard(d,f_num,batch,G,B,PI_value,S):
         ffht.fht(x_[i])
     x_ = x_.reshape(FLAGS.BATCHSIZE, T * d)
     x_value = np.multiply(x_, B)
-    x_value = np.sign(x_value)
+
     # #print(x_value)
     return x_value
 
@@ -90,41 +90,43 @@ def main(name ):
     read data and parameter initialize for the hadamard transform
     '''
     x_train, y_train, x_test, y_test= get_data(name)
-    acc_linear = np.zeros(3)
-    acc_binary = np.zeros(3)
-    acc_random = np.zeros(3)
+    time_hadamard_my= np.zeros(3)
+    time_extra = np.zeros(3)
+    time_random = np.zeros(3)
 
     x,y = x_train,y_train
-    n_number, f_num = np.shape(x)
-    d = 2 ** math.ceil(np.log2(f_num))
-    T = FLAGS.T
-    # rng =
-    G = np.random.randn(T * d)
-    B = np.random.uniform(-1, 1, T * d)
-    B[B > 0] = 1
-    B[B < 0] = -1
-    PI_value = np.random.permutation(d)
-    G_fro = G.reshape(T, d)
-    s_i = chi.rvs(d, size=(T, d))
-    S = np.multiply(s_i, np.array(np.linalg.norm(G_fro, axis=1) ** (-0.5)).reshape(T, -1))
-    S = S.reshape(1, -1)
-    FLAGS.BATCHSIZE = n_number
+    for iter in range(3):
+        n_number, f_num = np.shape(x)
+        d = 2 ** math.ceil(np.log2(f_num))
+        T = FLAGS.T
+        # rng =
+        G = np.random.randn(T * d)
+        B = np.random.uniform(-1, 1, T * d)
+        B[B > 0] = 1
+        B[B < 0] = -1
+        PI_value = np.random.permutation(d)
+        G_fro = G.reshape(T, d)
+        s_i = chi.rvs(d, size=(T, d))
+        S = np.multiply(s_i, np.array(np.linalg.norm(G_fro, axis=1) ** (-0.5)).reshape(T, -1))
+        S = S.reshape(1, -1)
+        FLAGS.BATCHSIZE = n_number
 
-    ff_transform = Fastfood(n_components=d*T,tradeoff_mem_accuracy="mem")
-    #test the time for my method
-    start = time.time()
-    x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S))
-    print(time.time()-start,x_value.shape)
-    #test the time for fastfood from sklean-extra
+        ff_transform = Fastfood(n_components=d*T,tradeoff_mem_accuracy="mem")
+        #test the time for my method
+        start = time.time()
+        x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S))
+        time_hadamard_my[iter] = time.time()-start
+        #test the time for fastfood from sklean-extra
 
-    pars = ff_transform.fit(x)
-    start = time.time()
-    x_value = np.asmatrix(np.sign(pars.transform(x)))
-    print(time.time() - start,x_value.shape)
-    start = time.time()
-    hash_plan = np.random.randn(f_num, T * d)
-    x_value = np.sign(np.dot(x,hash_plan))
-    print(time.time() - start, x_value.shape)
+        pars = ff_transform.fit(x)
+        start = time.time()
+        x_value = np.asmatrix(np.sign(pars.transform(x)))
+        time_extra[iter] = time.time() - start
+        start = time.time()
+        hash_plan = np.random.randn(f_num, T * d)
+        x_value = np.sign(np.dot(x,hash_plan))
+        time_random[iter] = time.time() - start
+    print(np.mean(time_hadamard_my),np.mean(time_extra),np.mean(time_random))
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
