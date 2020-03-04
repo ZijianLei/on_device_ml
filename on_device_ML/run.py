@@ -41,23 +41,26 @@ def get_data(name):
         x_test = x_test.todense()
     return x_train,y_train,x_test,y_test
 
-
+# @profile
 # the fast implement of using hadamard transform to apporximate the gaussian random projection
 def hadamard(d,f_num,batch,G,B,PI_value,S):
     T = FLAGS.T
     x_ = batch
+    n = x_.shape[0]
     x_ = np.pad(x_, ((0,0),(0, d - f_num)), 'constant', constant_values=(0, 0))  # x.shape [batch,d]
     x_ = np.tile(x_, (1, T))
     x_i = np.multiply(x_, S)
     x_ = x_i.reshape(FLAGS.BATCHSIZE*T, d)
-    h = 1
-    for i in range(x_.shape[0]):
+    for i in range(n):
         ffht.fht(x_[i])
-    x_transformed = np.multiply(x_.reshape(FLAGS.BATCHSIZE, d * T), G)
+    x_ =  x_.reshape(FLAGS.BATCHSIZE, d * T)
+    x_transformed = np.multiply(x_, G)
     x_ = np.reshape(x_transformed, (FLAGS.BATCHSIZE*T, d))
-    for i in range(x_.shape[0]):
+    for i in range(n):
         ffht.fht(x_[i])
+        x_[i] = np.sign(x_[i])
     x_ = x_.reshape(FLAGS.BATCHSIZE, T * d)
+    # x_value = np.sign(x_value)
     x_value = np.multiply(x_, B)
 
     # #print(x_value)
@@ -102,8 +105,7 @@ def main(name ):
         # rng =
         G = np.random.randn(T * d)
         B = np.random.uniform(-1, 1, T * d)
-        B[B > 0] = 1
-        B[B < 0] = -1
+        B = np.sign(B)
         PI_value = np.random.permutation(d)
         G_fro = G.reshape(T, d)
         s_i = chi.rvs(d, size=(T, d))

@@ -67,16 +67,17 @@ def get_data(name):
 def hadamard(d,f_num,batch,G,B,PI_value,S):
     T = FLAGS.T
     x_ = batch
-    x_ = np.pad(x_, ((0,0),(0, d - f_num)), 'constant', constant_values=(0, 0))  # x.shape [batch,d]
+    n = x_.shape[0]
+    x_ = np.pad(x_, ((0, 0), (0, d - f_num)), 'constant', constant_values=(0, 0))  # x.shape [batch,d]
     x_ = np.tile(x_, (1, T))
     x_i = np.multiply(x_, S)
-    x_ = x_i.reshape(FLAGS.BATCHSIZE*T, d)
-    h = 1
-    for i in range(x_.shape[0]):
+    x_ = x_i.reshape(FLAGS.BATCHSIZE * T, d)
+    for i in range(n):
         ffht.fht(x_[i])
-    x_transformed = np.multiply(x_.reshape(FLAGS.BATCHSIZE, d * T), G)
-    x_ = np.reshape(x_transformed, (FLAGS.BATCHSIZE*T, d))
-    for i in range(x_.shape[0]):
+    x_ = x_.reshape(FLAGS.BATCHSIZE, d * T)
+    x_transformed = np.multiply(x_, G)
+    x_ = np.reshape(x_transformed, (FLAGS.BATCHSIZE * T, d))
+    for i in range(n):
         ffht.fht(x_[i])
     x_ = x_.reshape(FLAGS.BATCHSIZE, T * d)
     x_value = np.multiply(x_, B)
@@ -94,7 +95,7 @@ def optimization(x_value,y_temp,W,class_number):
         hinge_loss = sklearn.metrics.hinge_loss(y_temp_c, init)*n_number
         loss_init = np.sum(hinge_loss)
         loss_0 = 0
-        while loss_0 != loss_init:
+        while loss_0!=loss_init:
             loss_0 = loss_init
             for i in range(project_d):
                 derta = init-np.multiply(W_temp[i],x_value[:,i])*2
@@ -119,7 +120,6 @@ def main(name ):
         n_number, f_num = np.shape(x)
         d = 2 ** math.ceil(np.log2(f_num))
         T = FLAGS.T
-
         G = np.random.randn(T * d)
         B = np.random.uniform(-1, 1, T * d)
         B[B > 0] = 1
@@ -131,7 +131,6 @@ def main(name ):
         S = S.reshape(1, -1)
         FLAGS.BATCHSIZE = n_number
 
-        ff_transform = Fastfood(n_components=d*T,tradeoff_mem_accuracy="mem")
         '''
         Start to processing the label
         '''
@@ -162,12 +161,8 @@ def main(name ):
 
         #print('Training Linear SVM')
         x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S))
-        # pars = ff_transform.fit(x)
-        # x_value = np.asmatrix(np.sign(pars.transform(x)))
-        # #print(x_value.shape)
         clf = LinearSVC()
         clf.fit(x_value, y)
-        #print('train acc', clf.score(x_value, y))
 
         #print('Training coordinate descent initiate from result of linear svm')
         W_fcP = clf.coef_
@@ -179,15 +174,11 @@ def main(name ):
             predict = np.argmax(np.array(np.dot(x_value, W_fcP)), axis=1)
             y_lable = np.argmax(y_temp, axis=1)
             acc = accuracy_score(np.array(y_lable), np.array(predict))
-            # acc_binary[iter] = acc
-            #print('train', acc)
         else:
             predict = np.array(np.dot(x_value, W_fcP))
             acc = accuracy_score(np.sign(y_temp), np.sign(predict))
             acc_binary[iter] = acc
             #print('train', acc)
-
-        #print('Training coordinate descent initiate from result of random initialize')
         W_fcP_random = np.asmatrix(np.sign(np.random.random((T*d,class_number))))
         W_fcP_random = optimization(x_value, y_temp, W_fcP_random, class_number)
         if class_number != 1:
@@ -199,8 +190,6 @@ def main(name ):
         else:
             predict = np.array(np.dot(x_value, W_fcP_random))
             acc = accuracy_score(np.sign(y_temp), np.sign(predict))
-            #print('train', acc)
-            # acc_random[iter] = acc
 
         x, y = x_test, y_test
         n_number, f_num = np.shape(x)
@@ -227,7 +216,6 @@ def main(name ):
         FLAGS.BATCHSIZE = n_number
         start = time.time()
         x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S))
-        # x_value = np.asmatrix(np.sign(ff_transform.transform(x)))
         time_of_transform = time.time()-start
         start= time.time()
         acc_linear[iter] = clf.score(x_value, y)
@@ -261,6 +249,7 @@ def main(name ):
         #print('test random initial', acc)
     #print(' random initialtest time',time_of_transform+time.time() - start)
     print(np.mean(acc_linear),np.mean(acc_binary),np.mean(acc_random))
+    # print(np.mean(acc_linear), np.mean(acc_binary), np.mean(acc_random))
     print(acc_linear,acc_binary,acc_random)
 
 
