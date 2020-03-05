@@ -51,16 +51,16 @@ def hadamard(d,f_num,batch,G,B,PI_value,S):
     x_ = np.tile(x_, (1, T))
     x_i = np.multiply(x_, S)
     x_ = x_i.reshape(FLAGS.BATCHSIZE*T, d)
-    for i in range(n):
+    for i in range(x_.shape[0]):
         ffht.fht(x_[i])
     x_ =  x_.reshape(FLAGS.BATCHSIZE, d * T)
     x_transformed = np.multiply(x_, G)
     x_ = np.reshape(x_transformed, (FLAGS.BATCHSIZE*T, d))
-    for i in range(n):
+    for i in range(x_.shape[0]):
         ffht.fht(x_[i])
-        x_[i] = np.sign(x_[i])
+        # x_[i] = np.sign(x_[i])
     x_ = x_.reshape(FLAGS.BATCHSIZE, T * d)
-    # x_value = np.sign(x_value)
+    x_ = np.sign(x_)
     x_value = np.multiply(x_, B)
 
     # #print(x_value)

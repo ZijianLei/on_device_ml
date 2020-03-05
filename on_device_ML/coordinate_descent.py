@@ -1,4 +1,4 @@
-# Copyright 2015 The TensorFlow Authors. All Rights Reserved.
+# Copyright 2013 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -46,13 +46,13 @@ def get_data(name):
     if FLAGS.d_openml != None:
         if name == 'CIFAR_10':
             x, y = sklearn.datasets.fetch_openml(name=name, return_X_y=True)
-            x = x/255
-            x_train, x_test = x[:50000], x[50000:]
-            y_train, y_test = y[:50000], y[50000:]
+            x = x/233
+            x_train, x_test = x[:30000], x[30000:]
+            y_train, y_test = y[:30000], y[30000:]
 
         else:
             x,y= sklearn.datasets.fetch_openml(name = name,return_X_y= True)
-            x = x / 255
+            x = x / 233
             x_train,x_test = x[:60000],x[60000:]
             y_train,y_test = y[:60000],y[60000:]
     else:
@@ -72,17 +72,17 @@ def hadamard(d,f_num,batch,G,B,PI_value,S):
     x_ = np.tile(x_, (1, T))
     x_i = np.multiply(x_, S)
     x_ = x_i.reshape(FLAGS.BATCHSIZE * T, d)
-    for i in range(n):
+    for i in range(n*T):
         ffht.fht(x_[i])
-    x_ = x_.reshape(FLAGS.BATCHSIZE, d * T)
+    x_ = x_.reshape(FLAGS.BATCHSIZE, T * d)
     x_transformed = np.multiply(x_, G)
     x_ = np.reshape(x_transformed, (FLAGS.BATCHSIZE * T, d))
-    for i in range(n):
+    for i in range(n*T):
         ffht.fht(x_[i])
     x_ = x_.reshape(FLAGS.BATCHSIZE, T * d)
     x_value = np.multiply(x_, B)
     x_value = np.sign(x_value)
-    # #print(x_value)
+    # exit()
     return x_value
 
 
@@ -93,15 +93,15 @@ def optimization(x_value,y_temp,W,class_number):
         y_temp_c = y_temp[:,c]
         init= np.dot(x_value, W_temp )
         hinge_loss = sklearn.metrics.hinge_loss(y_temp_c, init)*n_number
-        loss_init = np.sum(hinge_loss)
-        loss_0 = 0
-        while loss_0!=loss_init:
-            loss_0 = loss_init
+        loss_new = np.sum(hinge_loss)
+        loss_old =  2*loss_new
+        while (loss_old-loss_new)/loss_old >= 1e-6:
+            loss_old = loss_new
             for i in range(project_d):
                 derta = init-np.multiply(W_temp[i],x_value[:,i])*2
                 loss = sklearn.metrics.hinge_loss(y_temp_c,derta)*n_number
-                if loss < loss_init:
-                    loss_init = loss
+                if loss < loss_new:
+                    loss_new = loss
                     init = derta
                     W_temp[i] = -W_temp[i]
         W[:,c] = W_temp
@@ -127,7 +127,7 @@ def main(name ):
         PI_value = np.random.permutation(d)
         G_fro = G.reshape(T, d)
         s_i = chi.rvs(d, size=(T, d))
-        S = np.multiply(s_i, np.array(np.linalg.norm(G_fro, axis=1) ** (-0.5)).reshape(T, -1))
+        S = np.multiply(s_i, np.array(np.linalg.norm(G_fro, axis=1) ** (-0.3)).reshape(T, -1))
         S = S.reshape(1, -1)
         FLAGS.BATCHSIZE = n_number
 
@@ -163,33 +163,32 @@ def main(name ):
         x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S))
         clf = LinearSVC()
         clf.fit(x_value, y)
-
+        # print(clf.score(x_value,y))
         #print('Training coordinate descent initiate from result of linear svm')
         W_fcP = clf.coef_
 
         W_fcP = np.asmatrix(np.sign(W_fcP.reshape(-1, class_number)))
-
         W_fcP = optimization(x_value, y_temp, W_fcP, class_number)
-        if class_number != 1:
-            predict = np.argmax(np.array(np.dot(x_value, W_fcP)), axis=1)
-            y_lable = np.argmax(y_temp, axis=1)
-            acc = accuracy_score(np.array(y_lable), np.array(predict))
-        else:
-            predict = np.array(np.dot(x_value, W_fcP))
-            acc = accuracy_score(np.sign(y_temp), np.sign(predict))
-            acc_binary[iter] = acc
-            #print('train', acc)
+        # if class_number != 1:
+        #     predict = np.argmax(np.array(np.dot(x_value, W_fcP)), axis=1)
+        #     y_lable = np.argmax(y_temp, axis=1)
+        #     acc = accuracy_score(np.array(y_lable), np.array(predict))
+        # else:
+        #     predict = np.array(np.dot(x_value, W_fcP))
+        #     acc = accuracy_score(np.sign(y_temp), np.sign(predict))
+        #     acc_binary[iter] = acc
+        #     #print('train', acc)
         W_fcP_random = np.asmatrix(np.sign(np.random.random((T*d,class_number))))
         W_fcP_random = optimization(x_value, y_temp, W_fcP_random, class_number)
-        if class_number != 1:
-            predict = np.argmax(np.array(np.dot(x_value, W_fcP_random)), axis=1)
-            y_lable = np.argmax(y_temp, axis=1)
-            acc = accuracy_score(np.array(y_lable), np.array(predict))
-            #print('train', acc)
-            # acc_random[iter] = acc
-        else:
-            predict = np.array(np.dot(x_value, W_fcP_random))
-            acc = accuracy_score(np.sign(y_temp), np.sign(predict))
+        # if class_number != 1:
+        #     predict = np.argmax(np.array(np.dot(x_value, W_fcP_random)), axis=1)
+        #     y_lable = np.argmax(y_temp, axis=1)
+        #     acc = accuracy_score(np.array(y_lable), np.array(predict))
+        #     #print('train', acc)
+        #     # acc_random[iter] = acc
+        # else:
+        #     predict = np.array(np.dot(x_value, W_fcP_random))
+        #     acc = accuracy_score(np.sign(y_temp), np.sign(predict))
 
         x, y = x_test, y_test
         n_number, f_num = np.shape(x)
@@ -216,23 +215,20 @@ def main(name ):
         FLAGS.BATCHSIZE = n_number
         start = time.time()
         x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S))
-        time_of_transform = time.time()-start
-        start= time.time()
         acc_linear[iter] = clf.score(x_value, y)
-        #print('linear predict', clf.score(x_value, y))
-        #print('linear svm time', time_of_transform+time.time() - start)
+        '''
+
+        '''
         if class_number != 1:
             predict = np.argmax(np.array(np.dot(x_value, W_fcP)), axis=1)
             y_lable = np.argmax(y_temp, axis=1)
             acc = accuracy_score(np.array(y_lable), np.array(predict))
             acc_binary[iter] = acc
-            #print( 'test',acc)
         else:
             predict = np.array(np.dot(x_value, W_fcP))
             acc = accuracy_score(np.sign(y_temp), np.sign(predict))
             acc_binary[iter] = acc
-            #print('test', acc)
-        #print('test time',time_of_transform+time.time() - start)
+
         '''
         
         '''
@@ -241,15 +237,11 @@ def main(name ):
             y_lable = np.argmax(y_temp, axis=1)
             acc = accuracy_score(np.array(y_lable), np.array(predict))
             acc_random[iter] = acc
-            #print( 'test random initial',acc)
         else:
             predict = np.array(np.dot(x_value, W_fcP_random))
             acc = accuracy_score(np.sign(y_temp), np.sign(predict))
             acc_random[iter] = acc
-        #print('test random initial', acc)
-    #print(' random initialtest time',time_of_transform+time.time() - start)
     print(np.mean(acc_linear),np.mean(acc_binary),np.mean(acc_random))
-    # print(np.mean(acc_linear), np.mean(acc_binary), np.mean(acc_random))
     print(acc_linear,acc_binary,acc_random)
 
 
