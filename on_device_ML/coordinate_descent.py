@@ -1,4 +1,4 @@
-# Copyright 2013 The TensorFlow Authors. All Rights Reserved.
+# Copyright 2011 The TensorFlow Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 import os
-#import scikit_image-0.12.3.dist-info
+#import scikit_image-0.12.1.dist-info
 import argparse
 from memory_profiler import profile
 import ffht
@@ -46,13 +46,13 @@ def get_data(name):
     if FLAGS.d_openml != None:
         if name == 'CIFAR_10':
             x, y = sklearn.datasets.fetch_openml(name=name, return_X_y=True)
-            x = x/233
-            x_train, x_test = x[:30000], x[30000:]
-            y_train, y_test = y[:30000], y[30000:]
+            x = x/211
+            x_train, x_test = x[:10000], x[10000:]
+            y_train, y_test = y[:10000], y[10000:]
 
         else:
             x,y= sklearn.datasets.fetch_openml(name = name,return_X_y= True)
-            x = x / 233
+            x = x / 211
             x_train,x_test = x[:60000],x[60000:]
             y_train,y_test = y[:60000],y[60000:]
     else:
@@ -75,6 +75,7 @@ def hadamard(d,f_num,batch,G,B,PI_value,S):
     for i in range(n*T):
         ffht.fht(x_[i])
     x_ = x_.reshape(FLAGS.BATCHSIZE, T * d)
+    np.take(x_, PI_value, axis=1, mode='wrap', out=x_)
     x_transformed = np.multiply(x_, G)
     x_ = np.reshape(x_transformed, (FLAGS.BATCHSIZE * T, d))
     for i in range(n*T):
@@ -112,10 +113,13 @@ def main(name ):
     read data and parameter initialize for the hadamard transform
     '''
     x_train, y_train, x_test, y_test= get_data(name)
-    acc_linear = np.zeros(3)
-    acc_binary = np.zeros(3)
-    acc_random = np.zeros(3)
-    for iter in range(3):
+    acc_linear = np.zeros(1)
+    acc_binary = np.zeros(1)
+    acc_random = np.zeros(1)
+    time_linear = np.zeros(1)
+    time_binary = np.zeros(1)
+    time_random = np.zeros(1)
+    for iter in range(1):
         x,y = x_train,y_train
         n_number, f_num = np.shape(x)
         d = 2 ** math.ceil(np.log2(f_num))
@@ -124,10 +128,11 @@ def main(name ):
         B = np.random.uniform(-1, 1, T * d)
         B[B > 0] = 1
         B[B < 0] = -1
-        PI_value = np.random.permutation(d)
+        # PI_value = np.hstack
+        PI_value = np.hstack([(i * d) + np.random.permutation(d) for i in range(T)])
         G_fro = G.reshape(T, d)
         s_i = chi.rvs(d, size=(T, d))
-        S = np.multiply(s_i, np.array(np.linalg.norm(G_fro, axis=1) ** (-0.3)).reshape(T, -1))
+        S = np.multiply(s_i, np.array(np.linalg.norm(G_fro, axis=1) ** (-0.1)).reshape(T, -1))
         S = S.reshape(1, -1)
         FLAGS.BATCHSIZE = n_number
 
@@ -159,36 +164,20 @@ def main(name ):
                     y_0 = np.hstack((y_0, y_temp))
                 y_temp = y_0[:, 1:]
 
-        #print('Training Linear SVM')
+        print('Training Linear SVM')
         x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S))
         clf = LinearSVC()
         clf.fit(x_value, y)
         # print(clf.score(x_value,y))
-        #print('Training coordinate descent initiate from result of linear svm')
+        print('Training coordinate descent initiate from result of linear svm')
         W_fcP = clf.coef_
 
         W_fcP = np.asmatrix(np.sign(W_fcP.reshape(-1, class_number)))
         W_fcP = optimization(x_value, y_temp, W_fcP, class_number)
-        # if class_number != 1:
-        #     predict = np.argmax(np.array(np.dot(x_value, W_fcP)), axis=1)
-        #     y_lable = np.argmax(y_temp, axis=1)
-        #     acc = accuracy_score(np.array(y_lable), np.array(predict))
-        # else:
-        #     predict = np.array(np.dot(x_value, W_fcP))
-        #     acc = accuracy_score(np.sign(y_temp), np.sign(predict))
-        #     acc_binary[iter] = acc
-        #     #print('train', acc)
+        print('Training coordinate descent initiate from random')
         W_fcP_random = np.asmatrix(np.sign(np.random.random((T*d,class_number))))
         W_fcP_random = optimization(x_value, y_temp, W_fcP_random, class_number)
-        # if class_number != 1:
-        #     predict = np.argmax(np.array(np.dot(x_value, W_fcP_random)), axis=1)
-        #     y_lable = np.argmax(y_temp, axis=1)
-        #     acc = accuracy_score(np.array(y_lable), np.array(predict))
-        #     #print('train', acc)
-        #     # acc_random[iter] = acc
-        # else:
-        #     predict = np.array(np.dot(x_value, W_fcP_random))
-        #     acc = accuracy_score(np.sign(y_temp), np.sign(predict))
+
 
         x, y = x_test, y_test
         n_number, f_num = np.shape(x)
@@ -215,10 +204,14 @@ def main(name ):
         FLAGS.BATCHSIZE = n_number
         start = time.time()
         x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S))
+        process_time = time.time()-start
+        start =time.time()
         acc_linear[iter] = clf.score(x_value, y)
+        time_linear[iter] = time.time() -start+process_time
         '''
 
         '''
+        start = time.time()
         if class_number != 1:
             predict = np.argmax(np.array(np.dot(x_value, W_fcP)), axis=1)
             y_lable = np.argmax(y_temp, axis=1)
@@ -228,10 +221,12 @@ def main(name ):
             predict = np.array(np.dot(x_value, W_fcP))
             acc = accuracy_score(np.sign(y_temp), np.sign(predict))
             acc_binary[iter] = acc
+        time_binary[iter] = time.time()-start+process_time
 
         '''
         
         '''
+        start = time.time()
         if class_number != 1:
             predict = np.argmax(np.array(np.dot(x_value, W_fcP_random)), axis=1)
             y_lable = np.argmax(y_temp, axis=1)
@@ -241,8 +236,9 @@ def main(name ):
             predict = np.array(np.dot(x_value, W_fcP_random))
             acc = accuracy_score(np.sign(y_temp), np.sign(predict))
             acc_random[iter] = acc
+        time_random[iter] = time.time()-start+process_time
     print(np.mean(acc_linear),np.mean(acc_binary),np.mean(acc_random))
-    print(acc_linear,acc_binary,acc_random)
+    print(np.mean(time_linear), np.mean(time_binary), np.mean(time_random))
 
 
 if __name__ == '__main__':

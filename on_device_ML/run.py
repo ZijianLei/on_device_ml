@@ -51,16 +51,20 @@ def hadamard(d,f_num,batch,G,B,PI_value,S):
     x_ = np.tile(x_, (1, T))
     x_i = np.multiply(x_, S)
     x_ = x_i.reshape(FLAGS.BATCHSIZE*T, d)
-    for i in range(x_.shape[0]):
+    for i in range(n*T):
         ffht.fht(x_[i])
     x_ =  x_.reshape(FLAGS.BATCHSIZE, d * T)
+    # np.take(result, P, axis=1, mode="wrap", out=result)
+    np.take(x_,PI_value,axis=1,mode='wrap',out=x_)
+    # x_ = x_[:,PI_value]
     x_transformed = np.multiply(x_, G)
     x_ = np.reshape(x_transformed, (FLAGS.BATCHSIZE*T, d))
-    for i in range(x_.shape[0]):
+    for i in range(n*T):
         ffht.fht(x_[i])
         # x_[i] = np.sign(x_[i])
-    x_ = x_.reshape(FLAGS.BATCHSIZE, T * d)
     x_ = np.sign(x_)
+    x_ = x_.reshape(FLAGS.BATCHSIZE, T * d)
+
     x_value = np.multiply(x_, B)
 
     # #print(x_value)
@@ -93,31 +97,33 @@ def main(name ):
     read data and parameter initialize for the hadamard transform
     '''
     x_train, y_train, x_test, y_test= get_data(name)
-    time_hadamard_my= np.zeros(3)
-    time_extra = np.zeros(3)
-    time_random = np.zeros(3)
+    time_hadamard_my= np.zeros(1)
+    time_extra = np.zeros(1)
+    time_random = np.zeros(1)
 
     x,y = x_train,y_train
-    for iter in range(3):
+    for iter in range(1):
+        start = time.time()
         n_number, f_num = np.shape(x)
         d = 2 ** math.ceil(np.log2(f_num))
         T = FLAGS.T
         # rng =
+
         G = np.random.randn(T * d)
         B = np.random.uniform(-1, 1, T * d)
         B = np.sign(B)
-        PI_value = np.random.permutation(d)
+        PI_value = np.hstack([(i*d)+np.random.permutation(d) for i in range(T)])
         G_fro = G.reshape(T, d)
         s_i = chi.rvs(d, size=(T, d))
         S = np.multiply(s_i, np.array(np.linalg.norm(G_fro, axis=1) ** (-0.5)).reshape(T, -1))
         S = S.reshape(1, -1)
         FLAGS.BATCHSIZE = n_number
-
+        pre_time = time.time()-start
         ff_transform = Fastfood(n_components=d*T,tradeoff_mem_accuracy="mem")
         #test the time for my method
         start = time.time()
         x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S))
-        time_hadamard_my[iter] = time.time()-start
+        time_hadamard_my[iter] = time.time()-start+pre_time
         #test the time for fastfood from sklean-extra
 
         pars = ff_transform.fit(x)
@@ -129,7 +135,9 @@ def main(name ):
         x_value = np.sign(np.dot(x,hash_plan))
         time_random[iter] = time.time() - start
     print(np.mean(time_hadamard_my),np.mean(time_extra),np.mean(time_random))
+    # print(time_hadamard_my,time_extra,time_random)
 if __name__ == '__main__':
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument('-T', type=int,

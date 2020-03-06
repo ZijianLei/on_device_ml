@@ -7,9 +7,6 @@ import argparse
 import sys
 import math
 import sklearn
-
-import falconn
-from memory_profiler import profile
 import time
 from sklearn.metrics import *
 from sklearn.datasets import load_svmlight_file
@@ -93,32 +90,28 @@ def main(name,set_lsh_function):# 0 for naive random projection and 1 for pool t
                 y_temp = np.where(y[:] != i, -1, 1).reshape(n_number, 1)
                 y_0 = np.hstack((y_0, y_temp))
             y_temp = y_0[:, 1:]
+    clf.fit(x_value, y)
+    print('train LSH with Liblinear', clf.score(x_value, y))
     print('Training LSH')
-    W_fcP = np.asmatrix(-np.ones((T*d,class_number)))
+    W_fcP = clf.coef_
+
+    W_fcP = np.asmatrix(np.sign(W_fcP.reshape(-1, class_number)))
     for c in range(class_number):
-        W_temp = np.asmatrix(-np.ones((T * d,1)))
+        W_temp = W_fcP[:,c]
         y_temp_c = y_temp[:,c]
-        predict = np.dot(x_value, W_temp )
-        #loss_init = sklearn.metrics.mean_squared_error(y, predict)
-        # hinge_loss = np.max(np.hstack((np.zeros((n_number,1)),-np.multiply(y_temp_c,predict))),axis = 1)
-        hinge_loss = sklearn.metrics.hinge_loss(y_temp_c, predict)*n_number
-        loss_init = np.sum(hinge_loss)
-        loss_0 = 0
-        init = predict
-        print(loss_init)
-        while loss_0 != loss_init:
-            loss_0 = loss_init
-            for i in range(T*d):
+        init= np.dot(x_value, W_temp )
+        hinge_loss = sklearn.metrics.hinge_loss(y_temp_c, init)*n_number
+        loss_new = np.sum(hinge_loss)
+        loss_old =  2*loss_new
+        while (loss_old-loss_new)/loss_old >= 1e-5:
+            loss_old = loss_new
+            for i in range(x_value.shape[1]):
                 derta = init-np.multiply(W_temp[i],x_value[:,i])*2
-                # hinge_loss = np.max(np.hstack((np.zeros((n_number,1)),-np.multiply(y_temp_c,derta))),axis = 1)
-                # print(derta.shape)
                 loss = sklearn.metrics.hinge_loss(y_temp_c,derta)*n_number
-                if loss < loss_init:
-                    loss_init = loss
+                if loss < loss_new:
+                    loss_new = loss
                     init = derta
                     W_temp[i] = -W_temp[i]
-            # print(loss_init,j)
-            # j+=1
         W_fcP[:,c] = W_temp
     if class_number != 1:
         predict = np.argmax(np.array(np.dot(x_value, W_fcP)), axis=1)
@@ -131,8 +124,7 @@ def main(name,set_lsh_function):# 0 for naive random projection and 1 for pool t
         y_lable = y_temp
         acc = accuracy_score(np.sign(y_lable), np.sign(predict))
         print(acc, 'train')
-    clf.fit(x_value, y_lable)
-    print('train LSH with Liblinear',clf.score(x_value, y_lable))
+
 
 
 
@@ -230,5 +222,4 @@ if __name__ == '__main__':
         name = name_space[FLAGS.d_openml]
     else:
         name = FLAGS.d_libsvm
-
     main(name,0)
