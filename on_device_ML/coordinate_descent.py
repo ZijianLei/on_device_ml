@@ -46,13 +46,13 @@ def get_data(name):
     if FLAGS.d_openml != None:
         if name == 'CIFAR_10':
             x, y = sklearn.datasets.fetch_openml(name=name, return_X_y=True)
-            x = x/211
+            x = x/255
             x_train, x_test = x[:10000], x[10000:]
             y_train, y_test = y[:10000], y[10000:]
 
         else:
             x,y= sklearn.datasets.fetch_openml(name = name,return_X_y= True)
-            x = x / 211
+            x = x / 255
             x_train,x_test = x[:60000],x[60000:]
             y_train,y_test = y[:60000],y[60000:]
     else:
@@ -89,6 +89,8 @@ def hadamard(d,f_num,batch,G,B,PI_value,S):
 
 def optimization(x_value,y_temp,W,class_number):
     n_number, project_d = x_value.shape
+
+    #original optimization method 
     for c in range(class_number):
         W_temp = W[:,c]
         y_temp_c = y_temp[:,c]
@@ -106,20 +108,39 @@ def optimization(x_value,y_temp,W,class_number):
                     init = derta
                     W_temp[i] = -W_temp[i]
         W[:,c] = W_temp
+
+    # W_temp = W[:, :] #W shape (d_feature,num_of_class)
+    # y_temp_c = y_temp[:, :]
+    # init = np.dot(x_value, W_temp)
+    # hinge_loss = sklearn.metrics.hinge_loss(y_temp_c, init) * n_number
+    # loss_new = np.sum(hinge_loss,axis=1)
+    # loss_old = 2 * loss_new
+    # while (loss_old - loss_new) / loss_old >= 1e-6:
+    #     loss_old = loss_new
+    #     for i in range(project_d):
+    #         derta = init - np.multiply(W_temp[i], x_value[:, i]) * 2
+    #         loss = sklearn.metrics.hinge_loss(y_temp_c, derta) * n_number
+    #         if loss < loss_new:
+    #             loss_new = loss
+    #             init = derta
+    #             W_temp[i] = -W_temp[i]
+    # W = W_temp
+
     return W
 
 def main(name ):
+    print('start')
     '''
     read data and parameter initialize for the hadamard transform
     '''
     x_train, y_train, x_test, y_test= get_data(name)
-    acc_linear = np.zeros(1)
-    acc_binary = np.zeros(1)
-    acc_random = np.zeros(1)
-    time_linear = np.zeros(1)
-    time_binary = np.zeros(1)
-    time_random = np.zeros(1)
-    for iter in range(1):
+    acc_linear = np.zeros(2)
+    acc_binary = np.zeros(2)
+    acc_random = np.zeros(2)
+    time_linear = np.zeros(2)
+    time_binary = np.zeros(2)
+    time_random = np.zeros(2)
+    for iter in range(2):
         x,y = x_train,y_train
         n_number, f_num = np.shape(x)
         d = 2 ** math.ceil(np.log2(f_num))
@@ -237,8 +258,8 @@ def main(name ):
             acc = accuracy_score(np.sign(y_temp), np.sign(predict))
             acc_random[iter] = acc
         time_random[iter] = time.time()-start+process_time
-    print(np.mean(acc_linear),np.mean(acc_binary),np.mean(acc_random))
-    print(np.mean(time_linear), np.mean(time_binary), np.mean(time_random))
+    print(np.mean(acc_linear),np.mean(acc_binary),np.mean(acc_random),'T number %d'%(T))
+    print(np.mean(time_linear), np.mean(time_binary), np.mean(time_random),'T number %d'%(T))
 
 
 if __name__ == '__main__':
@@ -277,4 +298,5 @@ if __name__ == '__main__':
         name = name_space[FLAGS.d_openml]
     else:
         name = FLAGS.d_libsvm
+    print(name)
     main(name)

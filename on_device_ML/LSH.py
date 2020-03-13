@@ -103,7 +103,9 @@ def main(name,set_lsh_function):# 0 for naive random projection and 1 for pool t
         hinge_loss = sklearn.metrics.hinge_loss(y_temp_c, init)*n_number
         loss_new = np.sum(hinge_loss)
         loss_old =  2*loss_new
-        while (loss_old-loss_new)/loss_old >= 1e-5:
+        while loss_new/loss_old >1e-2:
+            print('new iter')
+            # print((loss_old - loss_new) / loss_old, 'converge')
             loss_old = loss_new
             for i in range(x_value.shape[1]):
                 derta = init-np.multiply(W_temp[i],x_value[:,i])*2
@@ -112,6 +114,7 @@ def main(name,set_lsh_function):# 0 for naive random projection and 1 for pool t
                     loss_new = loss
                     init = derta
                     W_temp[i] = -W_temp[i]
+                    print(loss_new / loss_old, 'converge')
         W_fcP[:,c] = W_temp
     if class_number != 1:
         predict = np.argmax(np.array(np.dot(x_value, W_fcP)), axis=1)
