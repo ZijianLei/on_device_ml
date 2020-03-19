@@ -35,6 +35,7 @@ from sklearn.metrics import *
 from sklearn.datasets import load_svmlight_file
 from sklearn_extra.kernel_approximation import Fastfood
 from sklearn.svm import  SVC,LinearSVC
+from sklearn.model_selection import  train_test_split
 import scipy
 import numpy as np
 from scipy.stats import chi
@@ -56,8 +57,12 @@ def get_data(name):
             x_train,x_test = x[:60000],x[60000:]
             y_train,y_test = y[:60000],y[60000:]
     else:
-        x_train,y_train = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" %(name,'train'))
-        x_test,y_test = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" % (name, 'test'))
+        if name == 'webspam' or 'covtype':
+            X,y = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" %(name,'train'))
+            x_train, x_test, y_train, y_test = train_test_split(X, y, test_size = 0.2)
+        else:
+            x_train,y_train = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" %(name,'train'))
+            x_test,y_test = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" % (name, 'test'))
         x_train = x_train.todense()
         x_test = x_test.todense()
     return x_train,y_train,x_test,y_test

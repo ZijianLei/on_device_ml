@@ -1,12 +1,10 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-from scipy.linalg import hadamard
-from sklearn_extra.utils._cyfht import fht as cyfht2
-import timeit
-from scipy.linalg import hadamard
+import os
+#import scikit_image-0.12.1.dist-info
 import argparse
-
+from memory_profiler import profile
 import ffht
 import math
 import time
@@ -14,6 +12,7 @@ from sklearn.metrics import *
 from sklearn.datasets import load_svmlight_file
 from sklearn_extra.kernel_approximation import Fastfood
 from sklearn.svm import  SVC,LinearSVC
+from sklearn.model_selection import  train_test_split
 import scipy
 import numpy as np
 from scipy.stats import chi
@@ -26,8 +25,8 @@ def get_data(name):
         if name == 'CIFAR_10':
             x, y = sklearn.datasets.fetch_openml(name=name, return_X_y=True)
             x = x/255
-            x_train, x_test = x[:50000], x[50000:]
-            y_train, y_test = y[:50000], y[50000:]
+            x_train, x_test = x[:10000], x[10000:]
+            y_train, y_test = y[:10000], y[10000:]
 
         else:
             x,y= sklearn.datasets.fetch_openml(name = name,return_X_y= True)
@@ -35,8 +34,12 @@ def get_data(name):
             x_train,x_test = x[:60000],x[60000:]
             y_train,y_test = y[:60000],y[60000:]
     else:
-        x_train,y_train = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" %(name,'train'))
-        x_test,y_test = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" % (name, 'test'))
+        if name == 'webspam' or 'covtype':
+            X,y = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" %(name,'train'))
+            x_train, x_test, y_train, y_test = train_test_split(X, y, test_size = 0.2)
+        else:
+            x_train,y_train = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" %(name,'train'))
+            x_test,y_test = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" % (name, 'test'))
         x_train = x_train.todense()
         x_test = x_test.todense()
     return x_train,y_train,x_test,y_test

@@ -20,12 +20,11 @@ https://www.tensorflow.org/get_started/mnist/pros
 # Disable linter warnings to maintain consistency with tutorial.
 # pylint: disable=invalid-name
 # pylint: disable=g-bad-import-order
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 import os
-#import scikit_image-0.12.3.dist-info
+#import scikit_image-0.12.1.dist-info
 import argparse
 from memory_profiler import profile
 import ffht
@@ -33,21 +32,23 @@ import math
 import time
 from sklearn.metrics import *
 from sklearn.datasets import load_svmlight_file
+from sklearn_extra.kernel_approximation import Fastfood
 from sklearn.svm import  SVC,LinearSVC
+from sklearn.model_selection import  train_test_split
 import scipy
 import numpy as np
 from scipy.stats import chi
 import sklearn
 from scipy._lib._util import _asarray_validated
-
+from sklearn.utils import check_array, check_random_state
 
 def get_data(name):
     if FLAGS.d_openml != None:
         if name == 'CIFAR_10':
             x, y = sklearn.datasets.fetch_openml(name=name, return_X_y=True)
             x = x/255
-            x_train, x_test = x[:50000], x[50000:]
-            y_train, y_test = y[:50000], y[50000:]
+            x_train, x_test = x[:10000], x[10000:]
+            y_train, y_test = y[:10000], y[10000:]
 
         else:
             x,y= sklearn.datasets.fetch_openml(name = name,return_X_y= True)
@@ -55,12 +56,15 @@ def get_data(name):
             x_train,x_test = x[:60000],x[60000:]
             y_train,y_test = y[:60000],y[60000:]
     else:
-        x_train,y_train = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" %(name,'train'))
-        x_test,y_test = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" % (name, 'test'))
+        if name == 'webspam' or 'covtype':
+            X,y = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" %(name,'train'))
+            x_train, x_test, y_train, y_test = train_test_split(X, y, test_size = 0.2)
+        else:
+            x_train,y_train = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" %(name,'train'))
+            x_test,y_test = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" % (name, 'test'))
         x_train = x_train.todense()
         x_test = x_test.todense()
     return x_train,y_train,x_test,y_test
-
 
 # the fast implement of using hadamard transform to apporximate the gaussian random projection
 def hadamard(d,f_num,batch,G,B,PI_value,S):
