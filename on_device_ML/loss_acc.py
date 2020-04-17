@@ -25,7 +25,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 import os
-#import scikit_image-0.12.1.dist-info
+# import scikit_image-0.12.1.dist-info
 import argparse
 from memory_profiler import profile
 import ffht
@@ -34,57 +34,58 @@ import time
 from sklearn.metrics import *
 from sklearn.datasets import load_svmlight_file
 from sklearn_extra.kernel_approximation import Fastfood
-from sklearn.svm import  SVC,LinearSVC
-from sklearn.model_selection import  train_test_split
+from sklearn.svm import SVC, LinearSVC
+from sklearn.model_selection import train_test_split
 import scipy
 import numpy as np
 from scipy.stats import chi
 import sklearn
+import matplotlib.pyplot as plt
 from scipy._lib._util import _asarray_validated
 from sklearn.utils import check_array, check_random_state
+
 
 def get_data(name):
     if FLAGS.d_openml != None:
         if name == 'CIFAR_10':
             x, y = sklearn.datasets.fetch_openml(name=name, return_X_y=True)
-            x = x/255
+            x = x / 255
             x_train, x_test = x[:10000], x[10000:]
             y_train, y_test = y[:10000], y[10000:]
 
         else:
-            x,y= sklearn.datasets.fetch_openml(name = name,return_X_y= True)
+            x, y = sklearn.datasets.fetch_openml(name=name, return_X_y=True)
             x = x / 255
-            x_train,x_test = x[:60000],x[60000:]
-            y_train,y_test = y[:60000],y[60000:]
+            x_train, x_test = x[:60000], x[60000:]
+            y_train, y_test = y[:60000], y[60000:]
     else:
         if name == 'webspam' or 'covtype':
-            X,y = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" %(name,'train'))
-            x_train, x_test, y_train, y_test = train_test_split(X, y, test_size = 0.2)
+            X, y = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" % (name, 'train'))
+            x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
         else:
-            x_train,y_train = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" %(name,'train'))
-            x_test,y_test = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" % (name, 'test'))
+            x_train, y_train = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" % (name, 'train'))
+            x_test, y_test = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" % (name, 'test'))
         x_train = x_train.todense()
         x_test = x_test.todense()
         print(x_train.shape)
-    return x_train,y_train,x_test,y_test
+    return x_train, y_train, x_test, y_test
 
 
 # the fast implement of using hadamard transform to apporximate the gaussian random projection
-def hadamard(d,f_num,batch,G,B,PI_value,S):
-    T = FLAGS.T
+def hadamard(d, f_num, batch, G, B, PI_value, S,T):
     x_ = batch
     n = x_.shape[0]
     x_ = np.pad(x_, ((0, 0), (0, d - f_num)), 'constant', constant_values=(0, 0))  # x.shape [batch,d]
     x_ = np.tile(x_, (1, T))
     x_i = np.multiply(x_, S)
     x_ = x_i.reshape(FLAGS.BATCHSIZE * T, d)
-    for i in range(n*T):
+    for i in range(n * T):
         ffht.fht(x_[i])
     x_ = x_.reshape(FLAGS.BATCHSIZE, T * d)
     np.take(x_, PI_value, axis=1, mode='wrap', out=x_)
     x_transformed = np.multiply(x_, G)
     x_ = np.reshape(x_transformed, (FLAGS.BATCHSIZE * T, d))
-    for i in range(n*T):
+    for i in range(n * T):
         ffht.fht(x_[i])
     x_ = x_.reshape(FLAGS.BATCHSIZE, T * d)
     x_value = np.multiply(x_, B)
@@ -92,6 +93,30 @@ def hadamard(d,f_num,batch,G,B,PI_value,S):
     # exit()
     return x_value
 
+
+def optimization(x_value, y_temp, W, class_number):
+    n_number, project_d = x_value.shape
+
+    # original optimization method
+    for c in range(class_number):
+        W_temp = W[:, c]
+        y_temp_c = y_temp[:, c]
+        init = np.dot(x_value, W_temp)
+        hinge_loss = sklearn.metrics.hinge_loss(y_temp_c, init) * n_number
+        loss_new = np.sum(hinge_loss)
+        loss_old = 2 * loss_new
+        while (loss_old - loss_new) / loss_old >= 1e-6:
+            loss_old = loss_new
+            for i in range(project_d):
+                derta = init - np.multiply(W_temp[i], x_value[:, i]) * 2
+                loss = sklearn.metrics.hinge_loss(y_temp_c, derta) * n_number
+                if loss < loss_new:
+                    loss_new = loss
+                    init = derta
+                    W_temp[i] = -W_temp[i]
+        W[:, c] = W_temp
+
+    return W
 def label_processing(y,n_number):
     '''
             Start to processing the label
@@ -123,64 +148,33 @@ def label_processing(y,n_number):
     return y_temp
 
 
-def optimization(x_value,y_temp,W,class_number):
-    n_number, project_d = x_value.shape
 
-    #original optimization method 
-    for c in range(class_number):
-        W_temp = W[:,c]
-        y_temp_c = y_temp[:,c]
-        init= np.dot(x_value, W_temp )
-        hinge_loss = sklearn.metrics.hinge_loss(y_temp_c, init)*n_number
-        loss_new = np.sum(hinge_loss)
-        loss_old =  2*loss_new
-        while (loss_old-loss_new)/loss_old >= 1e-6:
-            loss_old = loss_new
-            for i in range(project_d):
-                derta = init-np.multiply(W_temp[i],x_value[:,i])*2
-                loss = sklearn.metrics.hinge_loss(y_temp_c,derta)*n_number
-                if loss < loss_new:
-                    loss_new = loss
-                    init = derta
-                    W_temp[i] = -W_temp[i]
-        W[:,c] = W_temp
 
-    # W_temp = W[:, :] #W shape (d_feature,num_of_class)
-    # y_temp_c = y_temp[:, :]
-    # init = np.dot(x_value, W_temp)
-    # hinge_loss = sklearn.metrics.hinge_loss(y_temp_c, init) * n_number
-    # loss_new = np.sum(hinge_loss,axis=1)
-    # loss_old = 2 * loss_new
-    # while (loss_old - loss_new) / loss_old >= 1e-6:
-    #     loss_old = loss_new
-    #     for i in range(project_d):
-    #         derta = init - np.multiply(W_temp[i], x_value[:, i]) * 2
-    #         loss = sklearn.metrics.hinge_loss(y_temp_c, derta) * n_number
-    #         if loss < loss_new:
-    #             loss_new = loss
-    #             init = derta
-    #             W_temp[i] = -W_temp[i]
-    # W = W_temp
-
-    return W
-
-def main(name ):
-    print('start')
+def main(name):
+    fig = plt.figure()
+    ax1 = fig.add_subplot(111)
+    ax2 = ax1.twinx()
     '''
     read data and parameter initialize for the hadamard transform
     '''
-    x_train, y_train, x_test, y_test= get_data(name)
+    x_train, y_train, x_test, y_test = get_data(name)
     acc_linear = np.zeros(2)
     acc_binary = np.zeros(2)
     acc_random = np.zeros(2)
     time_linear = np.zeros(2)
     time_binary = np.zeros(2)
     time_random = np.zeros(2)
-    for iter in range(2):
-        x,y = x_train,y_train
+    marker = ['.','v','^','s','*']
+    for iter in range(5):
+
+
+        iter_loss = []
+        iter_acc = []
+        T= 2**iter
+        print(T)
+        x, y = x_train, y_train
         n_number, f_num = np.shape(x)
         d = 2 ** math.ceil(np.log2(f_num))
-        T = FLAGS.T
         G = np.random.randn(T * d)
         B = np.random.uniform(-1, 1, T * d)
         B[B > 0] = 1
@@ -192,90 +186,92 @@ def main(name ):
         S = np.multiply(s_i, np.array(np.linalg.norm(G_fro, axis=1) ** (-0.1)).reshape(T, -1))
         S = S.reshape(1, -1)
         FLAGS.BATCHSIZE = n_number
-
-        '''
-        Start to processing the label
-        '''
         class_number = len(np.unique(y))
-        y = label_processing(y,n_number)
+        if class_number ==2:
+            class_number -=1
 
-
-        print('Training Linear SVM')
-        x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S))
+        x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S,T))
+        y_temp= label_processing(y,n_number)
         clf = LinearSVC()
         clf.fit(x_value, y)
         # print(clf.score(x_value,y))
         print('Training coordinate descent initiate from result of linear svm')
         W_fcP = clf.coef_
-
         W_fcP = np.asmatrix(np.sign(W_fcP.reshape(-1, class_number)))
-        W_fcP = optimization(x_value, y_temp, W_fcP, class_number)
-        print('Training coordinate descent initiate from random')
-        W_fcP_random = np.asmatrix(np.sign(np.random.random((T*d,class_number))))
+        W = W_fcP
+        n_number, project_d = x_value.shape
+        test_number, f_num = np.shape(x_test)
+        FLAGS.BATCHSIZE = test_number
+        test_x = np.asmatrix(hadamard(d, f_num, x_test, G, B, PI_value, S,T))
 
-        W_fcP_random = optimization(x_value, y_temp, W_fcP_random, class_number)
-
-
-        x, y = x_test, y_test
-        n_number, f_num = np.shape(x)
-        if FLAGS.d_openml != None:
-            '''
-            lable convert from str to int in openml dataset
-            '''
-            y_0 = np.zeros((n_number, 1))
-            for i in range(class_number):
-                y_temp = np.where(y[:] != '%d' % i, -1, 1)
-                y_0 = np.hstack((y_0, np.mat(y_temp).T))
-            y_temp = y_0[:, 1:]
-        else:
-            if class_number == 1:
-                y_temp = np.array(np.where(y[:] != 1, -1, 1).reshape(n_number, 1))
+        test_y = label_processing(y_test, test_number)
+        # original optimization method
+        for c in range(class_number):
+            W_temp = W[:, c]
+            y_temp_c = y_temp[:, c]
+            init = np.dot(x_value, W_temp)
+            hinge_loss = sklearn.metrics.hinge_loss(y_temp_c, init) * n_number
+            loss_new = np.sum(hinge_loss)
+            if class_number != 1:
+                predict = np.argmax(np.array(np.dot(test_x, W_temp)), axis=1)
+                y_lable = np.argmax(test_y, axis=1)
+                acc = accuracy_score(np.array(y_lable), np.array(predict))
             else:
-                y_0 = np.zeros((n_number, 1))
-                y = y - 1
-                for i in range(class_number):
-                    y_temp = np.where(y[:] != i, -1, 1).reshape(n_number, 1)
-                    y_0 = np.hstack((y_0, y_temp))
-                y_temp = y_0[:, 1:]
-        n_number, f_num = np.shape(x)
-        FLAGS.BATCHSIZE = n_number
-        start = time.time()
-        x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S))
-        process_time = time.time()-start
-        start =time.time()
-        acc_linear[iter] = clf.score(x_value, y)
-        time_linear[iter] = time.time() -start+process_time
-        '''
+                predict = np.array(np.dot(test_x, W_temp))
+                acc = accuracy_score(np.sign(test_y), np.sign(predict))
+            iter_loss.append(loss_new)
+            iter_acc.append(acc)
+            loss_old = 2 * loss_new
+            while (loss_old - loss_new) / loss_old >= 1e-6:
+                loss_old = loss_new
+                for i in range(project_d):
+                    derta = init - np.multiply(W_temp[i], x_value[:, i]) * 2
+                    loss = sklearn.metrics.hinge_loss(y_temp_c, derta) * n_number
+                    if loss < loss_new:
+                        loss_new = loss
+                        init = derta
+                        W_temp[i] = -W_temp[i]
+                if class_number != 1:
+                    predict = np.argmax(np.array(np.dot(test_x, W_temp)), axis=1)
+                    y_lable = np.argmax(test_y, axis=1)
+                    acc = accuracy_score(np.array(y_lable), np.array(predict))
+                else:
+                    predict = np.array(np.dot(test_x, W_temp))
+                    acc = accuracy_score(np.sign(test_y), np.sign(predict))
+        print(predict)
+        plt.plot(predict,np.sign(predict))
+        plt.show()
+        exit()
+    #             iter_loss.append(loss_new)
+    #             iter_acc.append(acc)
+    #         axis_x = np.arange(1,len(iter_acc)+1,1)
+    #         print(iter_loss,iter_acc)
+    #         ax1.plot(axis_x[:],iter_loss[:],linewidth=2,linestyle= '--',color ='r',label='%d_loss' % T,marker = marker[iter],
+    #                  markersize=10)
+    #         ax2.plot(axis_x[:], iter_acc[:], linewidth = 2, linestyle = '--',color ='b', label = '%d_acc' % T,marker = marker[iter],
+    #                  markersize = 10)
+    # ax1.set_ylabel('loss')
+    # ax2.set_ylabel('acc')
+    # box = ax1.get_position()
+    # ax1.set_position([box.x0, box.y0 + box.height * 0.1,
+    #                  box.width, box.height * 0.9])
+    #
+    # # Put a legend below current axis
+    # ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
+    #           fancybox=True, shadow=True, ncol=5)
+    # box = ax2.get_position()
+    # ax2.set_position([box.x0, box.y0 + box.height * 0.1,
+    #                   box.width, box.height * 0.9])
+    #
+    # # Put a legend below current axis
+    # ax2.legend(loc='upper center', bbox_to_anchor=(0.5, -0.16),
+    #            fancybox=True, shadow=True, ncol=5)
+    # plt.savefig('%s_%s.png' % (name, 'loss_acc'))
+    # plt.show()
 
-        '''
-        start = time.time()
-        if class_number != 1:
-            predict = np.argmax(np.array(np.dot(x_value, W_fcP)), axis=1)
-            y_lable = np.argmax(y_temp, axis=1)
-            acc = accuracy_score(np.array(y_lable), np.array(predict))
-            acc_binary[iter] = acc
-        else:
-            predict = np.array(np.dot(x_value, W_fcP))
-            acc = accuracy_score(np.sign(y_temp), np.sign(predict))
-            acc_binary[iter] = acc
-        time_binary[iter] = time.time()-start+process_time
 
-        '''
-        
-        '''
-        start = time.time()
-        if class_number != 1:
-            predict = np.argmax(np.array(np.dot(x_value, W_fcP_random)), axis=1)
-            y_lable = np.argmax(y_temp, axis=1)
-            acc = accuracy_score(np.array(y_lable), np.array(predict))
-            acc_random[iter] = acc
-        else:
-            predict = np.array(np.dot(x_value, W_fcP_random))
-            acc = accuracy_score(np.sign(y_temp), np.sign(predict))
-            acc_random[iter] = acc
-        time_random[iter] = time.time()-start+process_time
-    print(np.mean(acc_linear),np.mean(acc_binary),np.mean(acc_random),'T number %d'%(T))
-    print(np.mean(time_linear), np.mean(time_binary), np.mean(time_random),'T number %d'%(T))
+
+
 
 
 if __name__ == '__main__':
@@ -295,7 +291,7 @@ if __name__ == '__main__':
                         0:CIFAR_10,\
                         1:Fashion-MNIST,\
                         2:mnist_784'
-                             )
+                        )
     '''
         available data:
         0:CIFAR_10,
@@ -306,10 +302,9 @@ if __name__ == '__main__':
                         default=None,
                         help='using data from libsvm dataset with data is well preprocessed')
 
-
     np.set_printoptions(threshold=np.inf, suppress=True)
     FLAGS, unparsed = parser.parse_known_args()
-    name_space = ['CIFAR_10','Fashion-MNIST','mnist_784']
+    name_space = ['CIFAR_10', 'Fashion-MNIST', 'mnist_784']
     if FLAGS.d_openml != None:
         name = name_space[FLAGS.d_openml]
     else:

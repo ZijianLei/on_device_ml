@@ -1,0 +1,84 @@
+webspam
+start
+webspam
+start
+webspam
+start
+webspam
+start
+webspam
+start
+webspam
+start
+Training Linear SVM
+Training Linear SVM
+Training Linear SVM
+Training Linear SVM
+Training Linear SVM
+Training Linear SVM
+/home/comp/cszjlei/anaconda3/lib/python3.7/site-packages/sklearn/svm/_base.py:947: ConvergenceWarning: Liblinear failed to converge, increase the number of iterations.
+  "the number of iterations.", ConvergenceWarning)
+Training coordinate descent initiate from result of linear svm
+Training coordinate descent initiate from random
+/home/comp/cszjlei/anaconda3/lib/python3.7/site-packages/sklearn/svm/_base.py:947: ConvergenceWarning: Liblinear failed to converge, increase the number of iterations.
+  "the number of iterations.", ConvergenceWarning)
+Training coordinate descent initiate from result of linear svm
+Training Linear SVM
+Training coordinate descent initiate from random
+Traceback (most recent call last):
+  File "coordinate_descent.py", line 307, in <module>
+    main(name)
+  File "coordinate_descent.py", line 196, in main
+    clf.fit(x_value, y)
+  File "/home/comp/cszjlei/anaconda3/lib/python3.7/site-packages/sklearn/svm/_classes.py", line 243, in fit
+    self.loss, sample_weight=sample_weight)
+  File "/home/comp/cszjlei/anaconda3/lib/python3.7/site-packages/sklearn/svm/_base.py", line 939, in _fit_liblinear
+    epsilon, sample_weight)
+  File "sklearn/svm/_liblinear.pyx", line 39, in sklearn.svm._liblinear.train_wrap
+OverflowError: value too large to convert to npy_int32
+Training Linear SVM
+/home/comp/cszjlei/anaconda3/lib/python3.7/site-packages/sklearn/svm/_base.py:947: ConvergenceWarning: Liblinear failed to converge, increase the number of iterations.
+  "the number of iterations.", ConvergenceWarning)
+Training coordinate descent initiate from result of linear svm
+Training coordinate descent initiate from random
+0.9051142857142858 0.8307857142857142 0.8075642857142857 T number 1
+82.90869212150574 81.81764137744904 81.80572474002838 T number 1
+/home/comp/cszjlei/anaconda3/lib/python3.7/site-packages/sklearn/svm/_base.py:947: ConvergenceWarning: Liblinear failed to converge, increase the number of iterations.
+  "the number of iterations.", ConvergenceWarning)
+Training coordinate descent initiate from result of linear svm
+/home/comp/cszjlei/anaconda3/lib/python3.7/site-packages/sklearn/svm/_base.py:947: ConvergenceWarning: Liblinear failed to converge, increase the number of iterations.
+  "the number of iterations.", ConvergenceWarning)
+Training coordinate descent initiate from result of linear svm
+Training coordinate descent initiate from random
+0.9322142857142857 0.8916928571428572 0.8605 T number 2
+4.3499733209609985 4.245052099227905 4.2470269203186035 T number 2
+Training coordinate descent initiate from random
+/home/comp/cszjlei/anaconda3/lib/python3.7/site-packages/sklearn/svm/_base.py:947: ConvergenceWarning: Liblinear failed to converge, increase the number of iterations.
+  "the number of iterations.", ConvergenceWarning)
+Training coordinate descent initiate from result of linear svm
+/home/comp/cszjlei/anaconda3/lib/python3.7/site-packages/sklearn/svm/_base.py:947: ConvergenceWarning: Liblinear failed to converge, increase the number of iterations.
+  "the number of iterations.", ConvergenceWarning)
+Training coordinate descent initiate from result of linear svm
+Training Linear SVM
+Training coordinate descent initiate from random
+/home/comp/cszjlei/anaconda3/lib/python3.7/site-packages/sklearn/svm/_base.py:947: ConvergenceWarning: Liblinear failed to converge, increase the number of iterations.
+  "the number of iterations.", ConvergenceWarning)
+Training coordinate descent initiate from result of linear svm
+Training Linear SVM
+Training coordinate descent initiate from random
+Training coordinate descent initiate from random
+/home/comp/cszjlei/anaconda3/lib/python3.7/site-packages/sklearn/svm/_base.py:947: ConvergenceWarning: Liblinear failed to converge, increase the number of iterations.
+  "the number of iterations.", ConvergenceWarning)
+Training coordinate descent initiate from result of linear svm
+0.9345642857142857 0.9123571428571429 0.8848642857142857 T number 4
+7.453133940696716 7.329216241836548 7.33085036277771 T number 4
+Training coordinate descent initiate from random
+Training Linear SVM
+0.9471928571428572 0.9384714285714286 0.9069928571428572 T number 8
+12.85047435760498 12.661168575286865 12.664311170578003 T number 8
+/home/comp/cszjlei/anaconda3/lib/python3.7/site-packages/sklearn/svm/_base.py:947: ConvergenceWarning: Liblinear failed to converge, increase the number of iterations.
+  "the number of iterations.", ConvergenceWarning)
+Training coordinate descent initiate from result of linear svm
+Training coordinate descent initiate from random
+0.97175 0.9509142857142857 0.9308785714285714 T number 16
+15.521432638168335 15.257084488868713 15.262028574943542 T number 16
