@@ -131,38 +131,32 @@ def optimization(x_value,y_temp,W,class_number):
         W_temp = W[:,c]
         y_temp_c = y_temp[:,c]
         init= np.dot(x_value, W_temp )
-        hinge_loss = sklearn.metrics.hinge_loss(y_temp_c, init)*n_number
+        hinge_loss = sklearn.metrics.hinge_loss(y_temp_c, init)
         loss_new = np.sum(hinge_loss)
         loss_old =  2*loss_new
         while (loss_old-loss_new)/loss_old >= 1e-6:
             loss_old = loss_new
             for i in range(project_d):
                 derta = init-np.multiply(W_temp[i],x_value[:,i])*2
-                loss = sklearn.metrics.hinge_loss(y_temp_c,derta)*n_number
+                loss = sklearn.metrics.hinge_loss(y_temp_c,derta)
                 if loss < loss_new:
                     loss_new = loss
                     init = derta
                     W_temp[i] = -W_temp[i]
         W[:,c] = W_temp
-
-    # W_temp = W[:, :] #W shape (d_feature,num_of_class)
-    # y_temp_c = y_temp[:, :]
-    # init = np.dot(x_value, W_temp)
-    # hinge_loss = sklearn.metrics.hinge_loss(y_temp_c, init) * n_number
-    # loss_new = np.sum(hinge_loss,axis=1)
-    # loss_old = 2 * loss_new
-    # while (loss_old - loss_new) / loss_old >= 1e-6:
-    #     loss_old = loss_new
-    #     for i in range(project_d):
-    #         derta = init - np.multiply(W_temp[i], x_value[:, i]) * 2
-    #         loss = sklearn.metrics.hinge_loss(y_temp_c, derta) * n_number
-    #         if loss < loss_new:
-    #             loss_new = loss
-    #             init = derta
-    #             W_temp[i] = -W_temp[i]
-    # W = W_temp
-
     return W
+
+def predict_acc(x_value,y_temp,W,class_number):
+    if class_number != 1:
+        predict = np.argmax(np.array(np.dot(x_value, W)), axis=1)
+        y_lable = np.argmax(y_temp, axis=1)
+        acc = accuracy_score(np.array(y_lable), np.array(predict))
+    else:
+        predict = np.array(np.dot(x_value, W))
+        acc = accuracy_score(np.sign(y_temp), np.sign(predict))
+    return  acc
+
+
 
 def main(name ):
     print('start')
@@ -207,38 +201,22 @@ def main(name ):
         # print(clf.score(x_value,y))
         print('Training coordinate descent initiate from result of linear svm')
         W_fcP = clf.coef_
-
         W_fcP = np.asmatrix(np.sign(W_fcP.reshape(-1, class_number)))
         W_fcP = optimization(x_value, y_temp, W_fcP, class_number)
+
         print('Training coordinate descent initiate from random')
         W_fcP_random = np.asmatrix(np.sign(np.random.random((T*d,class_number))))
-
         W_fcP_random = optimization(x_value, y_temp, W_fcP_random, class_number)
 
-
+        '''
+        Start the test process
+        '''
         x, y = x_test, y_test
         n_number, f_num = np.shape(x)
-        if FLAGS.d_openml != None:
-            '''
-            lable convert from str to int in openml dataset
-            '''
-            y_0 = np.zeros((n_number, 1))
-            for i in range(class_number):
-                y_temp = np.where(y[:] != '%d' % i, -1, 1)
-                y_0 = np.hstack((y_0, np.mat(y_temp).T))
-            y_temp = y_0[:, 1:]
-        else:
-            if class_number == 1:
-                y_temp = np.array(np.where(y[:] != 1, -1, 1).reshape(n_number, 1))
-            else:
-                y_0 = np.zeros((n_number, 1))
-                y = y - 1
-                for i in range(class_number):
-                    y_temp = np.where(y[:] != i, -1, 1).reshape(n_number, 1)
-                    y_0 = np.hstack((y_0, y_temp))
-                y_temp = y_0[:, 1:]
-        n_number, f_num = np.shape(x)
+        y_temp = label_processing(y,n_number)
         FLAGS.BATCHSIZE = n_number
+
+
         start = time.time()
         x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S))
         process_time = time.time()-start
@@ -249,30 +227,14 @@ def main(name ):
 
         '''
         start = time.time()
-        if class_number != 1:
-            predict = np.argmax(np.array(np.dot(x_value, W_fcP)), axis=1)
-            y_lable = np.argmax(y_temp, axis=1)
-            acc = accuracy_score(np.array(y_lable), np.array(predict))
-            acc_binary[iter] = acc
-        else:
-            predict = np.array(np.dot(x_value, W_fcP))
-            acc = accuracy_score(np.sign(y_temp), np.sign(predict))
-            acc_binary[iter] = acc
+        acc_binary[iter] = predict_acc(x_value,y_temp,W_fcP,class_number)
         time_binary[iter] = time.time()-start+process_time
 
         '''
         
         '''
         start = time.time()
-        if class_number != 1:
-            predict = np.argmax(np.array(np.dot(x_value, W_fcP_random)), axis=1)
-            y_lable = np.argmax(y_temp, axis=1)
-            acc = accuracy_score(np.array(y_lable), np.array(predict))
-            acc_random[iter] = acc
-        else:
-            predict = np.array(np.dot(x_value, W_fcP_random))
-            acc = accuracy_score(np.sign(y_temp), np.sign(predict))
-            acc_random[iter] = acc
+        acc_random[iter] = predict_acc(x_value,y_temp,W_fcP_random,class_number)
         time_random[iter] = time.time()-start+process_time
     print(np.mean(acc_linear),np.mean(acc_binary),np.mean(acc_random),'T number %d'%(T))
     print(np.mean(time_linear), np.mean(time_binary), np.mean(time_random),'T number %d'%(T))

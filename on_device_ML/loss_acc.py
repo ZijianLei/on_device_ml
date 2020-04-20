@@ -166,8 +166,6 @@ def main(name):
     time_random = np.zeros(2)
     marker = ['.','v','^','s','*']
     for iter in range(5):
-
-
         iter_loss = []
         iter_acc = []
         T= 2**iter
@@ -222,24 +220,24 @@ def main(name):
             iter_loss.append(loss_new)
             iter_acc.append(acc)
             loss_old = 2 * loss_new
-            while (loss_old - loss_new) / loss_old >= 1e-6:
-                loss_old = loss_new
-                for i in range(project_d):
-                    derta = init - np.multiply(W_temp[i], x_value[:, i]) * 2
-                    loss = sklearn.metrics.hinge_loss(y_temp_c, derta) * n_number
-                    if loss < loss_new:
-                        loss_new = loss
-                        init = derta
-                        W_temp[i] = -W_temp[i]
-                if class_number != 1:
-                    predict = np.argmax(np.array(np.dot(test_x, W_temp)), axis=1)
-                    y_lable = np.argmax(test_y, axis=1)
-                    acc = accuracy_score(np.array(y_lable), np.array(predict))
-                else:
-                    predict = np.array(np.dot(test_x, W_temp))
-                    acc = accuracy_score(np.sign(test_y), np.sign(predict))
-        print(predict)
-        plt.plot(predict,np.sign(predict))
+            # while (loss_old - loss_new) / loss_old >= 1e-6:
+            #     loss_old = loss_new
+            #     for i in range(project_d):
+            #         derta = init - np.multiply(W_temp[i], x_value[:, i]) * 2
+            #         loss = sklearn.metrics.hinge_loss(y_temp_c, derta) * n_number
+            #         if loss < loss_new:
+            #             loss_new = loss
+            #             init = derta
+            #             W_temp[i] = -W_temp[i]
+            #     if class_number != 1:
+            #         predict = np.argmax(np.array(np.dot(test_x, W_temp)), axis=1)
+            #         y_lable = np.argmax(test_y, axis=1)
+            #         acc = accuracy_score(np.array(y_lable), np.array(predict))
+            #     else:
+            #         predict = np.array(np.dot(test_x, W_temp))
+            #         acc = accuracy_score(np.sign(test_y), np.sign(predict))
+
+            plt.scatter(test_x,test_y)
         plt.show()
         exit()
     #             iter_loss.append(loss_new)
