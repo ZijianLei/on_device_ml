@@ -94,28 +94,38 @@ def hadamard(d, f_num, batch, G, B, PI_value, S,T):
     return x_value
 
 
-def optimization(x_value, y_temp, W, class_number):
+def optimization(x_value,y_temp,W,class_number):
     n_number, project_d = x_value.shape
 
-    # original optimization method
+    #original optimization method
     for c in range(class_number):
-        W_temp = W[:, c]
-        y_temp_c = y_temp[:, c]
-        init = np.dot(x_value, W_temp)
-        hinge_loss = sklearn.metrics.hinge_loss(y_temp_c, init) * n_number
-        loss_new = np.sum(hinge_loss)
-        loss_old = 2 * loss_new
-        while (loss_old - loss_new) / loss_old >= 1e-6:
+        W_temp = W[:,c]
+        y_temp_c = y_temp[:,c]
+        init= np.dot(x_value, W_temp )
+        hinge_loss = sklearn.metrics.hinge_loss(y_temp_c, init)
+        loss_new = np.sum(hinge_loss)+ sum(abs(W_temp))
+        loss_old =  2*loss_new
+        j  = 0
+        while (loss_old-loss_new)/loss_old >= 1e-6:
             loss_old = loss_new
-            for i in range(project_d):
-                derta = init - np.multiply(W_temp[i], x_value[:, i]) * 2
-                loss = sklearn.metrics.hinge_loss(y_temp_c, derta) * n_number
-                if loss < loss_new:
-                    loss_new = loss
-                    init = derta
-                    W_temp[i] = -W_temp[i]
-        W[:, c] = W_temp
-
+            for i in np.random.choice(project_d,project_d,replace=False):
+                if W_temp[i] !=0:
+                    derta = init-np.multiply(W_temp[i],x_value[:,i])
+                    loss = sklearn.metrics.hinge_loss(y_temp_c,derta) + sum(abs(W_temp))*(10**(-j))
+                    if loss < loss_new:
+                        loss_new = loss
+                        init = derta
+                        W_temp[i] =0
+                else:
+                    w_i = np.sign(np.random.rand(1))
+                    derta = init+np.multiply(w_i,x_value[:,i])
+                    loss = sklearn.metrics.hinge_loss(y_temp_c,derta)+sum(abs(W_temp))*(10**(-j))
+                    if loss < loss_new:
+                        loss_new = loss
+                        init = derta
+                        W_temp[i] =w_i
+                j +=1
+        W[:,c] = W_temp
     return W
 def label_processing(y,n_number):
     '''
@@ -165,7 +175,7 @@ def main(name):
     time_binary = np.zeros(2)
     time_random = np.zeros(2)
     marker = ['.','v','^','s','*']
-    for iter in range(5):
+    for iter in range(4):
         iter_loss = []
         iter_acc = []
         T= 2**iter
@@ -220,52 +230,66 @@ def main(name):
             iter_loss.append(loss_new)
             iter_acc.append(acc)
             loss_old = 2 * loss_new
-            # while (loss_old - loss_new) / loss_old >= 1e-6:
-            #     loss_old = loss_new
-            #     for i in range(project_d):
-            #         derta = init - np.multiply(W_temp[i], x_value[:, i]) * 2
-            #         loss = sklearn.metrics.hinge_loss(y_temp_c, derta) * n_number
-            #         if loss < loss_new:
-            #             loss_new = loss
-            #             init = derta
-            #             W_temp[i] = -W_temp[i]
-            #     if class_number != 1:
-            #         predict = np.argmax(np.array(np.dot(test_x, W_temp)), axis=1)
-            #         y_lable = np.argmax(test_y, axis=1)
-            #         acc = accuracy_score(np.array(y_lable), np.array(predict))
-            #     else:
-            #         predict = np.array(np.dot(test_x, W_temp))
-            #         acc = accuracy_score(np.sign(test_y), np.sign(predict))
+            loss_new = np.sum(hinge_loss) + sum(abs(W_temp))
+            loss_old = 2 * loss_new
+            j = 0
+            while (loss_old - loss_new) / loss_old >= 1e-6:
+                loss_old = loss_new
+                for i in np.random.choice(project_d, project_d, replace=False):
+                    if W_temp[i] != 0:
+                        derta = init - np.multiply(W_temp[i], x_value[:, i])
+                        loss = sklearn.metrics.hinge_loss(y_temp_c, derta) + sum(abs(W_temp)) * (10 ** (-j))
+                        if loss < loss_new:
+                            loss_new = loss
+                            init = derta
+                            W_temp[i] = 0
+                    else:
+                        w_i = np.sign(np.random.rand(1))
+                        derta = init + np.multiply(w_i, x_value[:, i])
+                        loss = sklearn.metrics.hinge_loss(y_temp_c, derta) + sum(abs(W_temp)) * (10 ** (-j))
+                        if loss < loss_new:
+                            loss_new = loss
+                            init = derta
+                            W_temp[i] = w_i
+                    j += 1
+                W[:, c] = W_temp
+                if class_number != 1:
+                    predict = np.argmax(np.array(np.dot(test_x, W_temp)), axis=1)
+                    y_lable = np.argmax(test_y, axis=1)
+                    acc = accuracy_score(np.array(y_lable), np.array(predict))
+                else:
+                    predict = np.array(np.dot(test_x, W_temp))
+                    acc = accuracy_score(np.sign(test_y), np.sign(predict))
+                iter_loss.append(loss_new)
+                iter_acc.append(acc)
+        #     plt.scatter(test_x,test_y)
+        # plt.show()
+        # exit()
 
-            plt.scatter(test_x,test_y)
-        plt.show()
-        exit()
-    #             iter_loss.append(loss_new)
-    #             iter_acc.append(acc)
-    #         axis_x = np.arange(1,len(iter_acc)+1,1)
-    #         print(iter_loss,iter_acc)
-    #         ax1.plot(axis_x[:],iter_loss[:],linewidth=2,linestyle= '--',color ='r',label='%d_loss' % T,marker = marker[iter],
-    #                  markersize=10)
-    #         ax2.plot(axis_x[:], iter_acc[:], linewidth = 2, linestyle = '--',color ='b', label = '%d_acc' % T,marker = marker[iter],
-    #                  markersize = 10)
-    # ax1.set_ylabel('loss')
-    # ax2.set_ylabel('acc')
-    # box = ax1.get_position()
-    # ax1.set_position([box.x0, box.y0 + box.height * 0.1,
-    #                  box.width, box.height * 0.9])
-    #
-    # # Put a legend below current axis
-    # ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
-    #           fancybox=True, shadow=True, ncol=5)
-    # box = ax2.get_position()
-    # ax2.set_position([box.x0, box.y0 + box.height * 0.1,
-    #                   box.width, box.height * 0.9])
-    #
-    # # Put a legend below current axis
-    # ax2.legend(loc='upper center', bbox_to_anchor=(0.5, -0.16),
-    #            fancybox=True, shadow=True, ncol=5)
-    # plt.savefig('%s_%s.png' % (name, 'loss_acc'))
-    # plt.show()
+            axis_x = np.arange(1,len(iter_acc)+1,1)
+            print(iter_loss,iter_acc)
+            ax1.plot(axis_x[:],iter_loss[:],linewidth=2,linestyle= '--',color ='r',label='%d_loss' % T,marker = marker[iter],
+                     markersize=10)
+            ax2.plot(axis_x[:], iter_acc[:], linewidth = 2, linestyle = '--',color ='b', label = '%d_acc' % T,marker = marker[iter],
+                     markersize = 10)
+    ax1.set_ylabel('loss')
+    ax2.set_ylabel('acc')
+    box = ax1.get_position()
+    ax1.set_position([box.x0, box.y0 + box.height * 0.1,
+                     box.width, box.height * 0.9])
+
+    # Put a legend below current axis
+    ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
+              fancybox=True, shadow=True, ncol=5)
+    box = ax2.get_position()
+    ax2.set_position([box.x0, box.y0 + box.height * 0.1,
+                      box.width, box.height * 0.9])
+
+    # Put a legend below current axis
+    ax2.legend(loc='upper center', bbox_to_anchor=(0.5, -0.16),
+               fancybox=True, shadow=True, ncol=5)
+    plt.savefig('%s_%s.png' % (name, 'loss_acc'))
+    plt.show()
 
 
 

@@ -132,17 +132,28 @@ def optimization(x_value,y_temp,W,class_number):
         y_temp_c = y_temp[:,c]
         init= np.dot(x_value, W_temp )
         hinge_loss = sklearn.metrics.hinge_loss(y_temp_c, init)
-        loss_new = np.sum(hinge_loss)
+        loss_new = np.sum(hinge_loss)+ sum(abs(W_temp))
         loss_old =  2*loss_new
+        j = 0
         while (loss_old-loss_new)/loss_old >= 1e-6:
             loss_old = loss_new
-            for i in range(project_d):
-                derta = init-np.multiply(W_temp[i],x_value[:,i])*2
-                loss = sklearn.metrics.hinge_loss(y_temp_c,derta)
-                if loss < loss_new:
-                    loss_new = loss
-                    init = derta
-                    W_temp[i] = -W_temp[i]
+            for i in np.random.choice(project_d,project_d,replace=False):
+                if W_temp[i] !=0:
+                    derta = init-np.multiply(W_temp[i],x_value[:,i])
+                    loss = sklearn.metrics.hinge_loss(y_temp_c,derta)+ sum(abs(W_temp))*(10**(-j))
+                    if loss < loss_new:
+                        loss_new = loss
+                        init = derta
+                        W_temp[i] =0
+                else:
+                    w_i = np.sign(np.random.rand(1))
+                    derta = init+np.multiply(w_i,x_value[:,i])
+                    loss = sklearn.metrics.hinge_loss(y_temp_c,derta)+sum(abs(W_temp))*(10**(-j))
+                    if loss < loss_new:
+                        loss_new = loss
+                        init = derta
+                        W_temp[i] =w_i
+            j +=1
         W[:,c] = W_temp
     return W
 
@@ -186,12 +197,13 @@ def main(name ):
         S = np.multiply(s_i, np.array(np.linalg.norm(G_fro, axis=1) ** (-0.1)).reshape(T, -1))
         S = S.reshape(1, -1)
         FLAGS.BATCHSIZE = n_number
-
-        '''
-        Start to processing the label
-        '''
         class_number = len(np.unique(y))
-        y = label_processing(y,n_number)
+        if class_number == 2:
+            class_number -= 1
+        '''
+        Start to prossssscessing the label
+        '''
+        y_temp = label_processing(y,n_number)
 
 
         print('Training Linear SVM')
@@ -202,6 +214,7 @@ def main(name ):
         print('Training coordinate descent initiate from result of linear svm')
         W_fcP = clf.coef_
         W_fcP = np.asmatrix(np.sign(W_fcP.reshape(-1, class_number)))
+        print(W_fcP.shape)
         W_fcP = optimization(x_value, y_temp, W_fcP, class_number)
 
         print('Training coordinate descent initiate from random')
