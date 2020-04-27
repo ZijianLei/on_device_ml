@@ -174,12 +174,12 @@ def main(name):
     time_linear = np.zeros(2)
     time_binary = np.zeros(2)
     time_random = np.zeros(2)
-    marker = ['.','v','^','s','*']
-    for iter in range(4):
-        iter_loss = []
-        iter_acc = []
-        T= 2**iter
-        print(T)
+    marker = ['.','v','^','s','*','+']
+    color = ['r','g','b','c','y','k']
+    for iter in range(1):
+
+        T = FLAGS.T
+
         x, y = x_train, y_train
         n_number, f_num = np.shape(x)
         d = 2 ** math.ceil(np.log2(f_num))
@@ -204,9 +204,7 @@ def main(name):
         clf.fit(x_value, y)
         # print(clf.score(x_value,y))
         print('Training coordinate descent initiate from result of linear svm')
-        W_fcP = clf.coef_
-        W_fcP = np.asmatrix(np.sign(W_fcP.reshape(-1, class_number)))
-        W = W_fcP
+
         n_number, project_d = x_value.shape
         test_number, f_num = np.shape(x_test)
         FLAGS.BATCHSIZE = test_number
@@ -214,45 +212,18 @@ def main(name):
 
         test_y = label_processing(y_test, test_number)
         # original optimization method
-        for c in range(class_number):
-            W_temp = W[:, c]
-            y_temp_c = y_temp[:, c]
-            init = np.dot(x_value, W_temp)
-            hinge_loss = sklearn.metrics.hinge_loss(y_temp_c, init) * n_number
-            loss_new = np.sum(hinge_loss)
-            if class_number != 1:
-                predict = np.argmax(np.array(np.dot(test_x, W_temp)), axis=1)
-                y_lable = np.argmax(test_y, axis=1)
-                acc = accuracy_score(np.array(y_lable), np.array(predict))
-            else:
-                predict = np.array(np.dot(test_x, W_temp))
-                acc = accuracy_score(np.sign(test_y), np.sign(predict))
-            iter_loss.append(loss_new)
-            iter_acc.append(acc)
-            loss_old = 2 * loss_new
-            loss_new = np.sum(hinge_loss) + sum(abs(W_temp))
-            loss_old = 2 * loss_new
-            j = 0
-            while (loss_old - loss_new) / loss_old >= 1e-6:
-                loss_old = loss_new
-                for i in np.random.choice(project_d, project_d, replace=False):
-                    if W_temp[i] != 0:
-                        derta = init - np.multiply(W_temp[i], x_value[:, i])
-                        loss = sklearn.metrics.hinge_loss(y_temp_c, derta) + sum(abs(W_temp)) * (10 ** (-j))
-                        if loss < loss_new:
-                            loss_new = loss
-                            init = derta
-                            W_temp[i] = 0
-                    else:
-                        w_i = np.sign(np.random.rand(1))
-                        derta = init + np.multiply(w_i, x_value[:, i])
-                        loss = sklearn.metrics.hinge_loss(y_temp_c, derta) + sum(abs(W_temp)) * (10 ** (-j))
-                        if loss < loss_new:
-                            loss_new = loss
-                            init = derta
-                            W_temp[i] = w_i
-                    j += 1
-                W[:, c] = W_temp
+        range_lamda = [0,1e-4,5e-4,1e-3,5e-3,1e-2]
+        for idx,lamda in enumerate(range_lamda):
+            W_fcP = clf.coef_
+            W_fcP = np.asmatrix(np.sign(W_fcP.reshape(-1, class_number)))
+            W = W_fcP
+            iter_loss = []
+            iter_acc = []
+            for c in range(class_number):
+                W_temp = W[:, c]
+                y_temp_c = y_temp[:, c]
+                init = np.dot(x_value, W_temp)
+                hinge_loss = sklearn.metrics.hinge_loss(y_temp_c, init) * n_number
                 if class_number != 1:
                     predict = np.argmax(np.array(np.dot(test_x, W_temp)), axis=1)
                     y_lable = np.argmax(test_y, axis=1)
@@ -260,20 +231,77 @@ def main(name):
                 else:
                     predict = np.array(np.dot(test_x, W_temp))
                     acc = accuracy_score(np.sign(test_y), np.sign(predict))
+                regularization = sum(abs(W_temp)) * lamda
+                loss_new = np.sum(hinge_loss) + regularization
                 iter_loss.append(loss_new)
                 iter_acc.append(acc)
-        #     plt.scatter(test_x,test_y)
-        # plt.show()
-        # exit()
+                loss_old = 2 * loss_new
+                j = 0
+                while (loss_old - loss_new) / loss_old >= 1e-6:
+                    loss_old = loss_new
+                    for i in np.random.choice(project_d, project_d, replace=False):
+                        if W_temp[i] != 0:
+                            w_i =W_temp[i]
+                            w_i2= -W_temp[i]
+                            derta = init - np.multiply(w_i, x_value[:, i])
+                            regularization -= lamda
+                            derta2 = init - 2 * np.multiply(w_i, x_value[:, i])
+                            regularization_2 = regularization +  lamda
+                            loss = sklearn.metrics.hinge_loss(y_temp_c, derta) + regularization
+                            if loss < loss_new:
+                                loss_new = loss
+                                init = derta
+                                W_temp[i] = 0
+                            loss = sklearn.metrics.hinge_loss(y_temp_c, derta2) + regularization_2
+                            if loss < loss_new:
+                                loss_new = loss
+                                init = derta2
+                                W_temp[i] = w_i2
+                                regularization = regularization_2
+                        else:
+                            derta = init + x_value[:, i]
+                            regularization += lamda
+                            derta2 = init - x_value[:, i]
 
+                            loss = sklearn.metrics.hinge_loss(y_temp_c, derta) + regularization
+                            if loss < loss_new:
+                                loss_new = loss
+                                init = derta
+                                W_temp[i] = 1
+                            loss = sklearn.metrics.hinge_loss(y_temp_c, derta2) + regularization
+                            if loss < loss_new:
+                                loss_new = loss
+                                init = derta2
+                                W_temp[i] = -1
+
+                    if class_number != 1:
+                        predict = np.argmax(np.array(np.dot(test_x, W_temp)), axis=1)
+                        y_lable = np.argmax(test_y, axis=1)
+                        acc = accuracy_score(np.array(y_lable), np.array(predict))
+                    else:
+                        predict = np.array(np.dot(test_x, W_temp))
+                        acc = accuracy_score(np.sign(test_y), np.sign(predict))
+                    iter_loss.append(loss_new)
+                    iter_acc.append(acc)
+                    j += 1
+                W[:, c] = W_temp
+                print(np.count_nonzero(W))
+            clf2 = LinearSVC()
+            clf2.fit(np.dot(x_value,W), y)
+            acc = clf2.score(np.dot(test_x,W), test_y)
+            # print(clf2.coef_)
+            iter_acc.append(acc)
+            #     plt.scatter(test_x,test_y)
+            # plt.show()
+            # exit()
             axis_x = np.arange(1,len(iter_acc)+1,1)
-            print(iter_loss,iter_acc)
-            ax1.plot(axis_x[:],iter_loss[:],linewidth=2,linestyle= '--',color ='r',label='%d_loss' % T,marker = marker[iter],
-                     markersize=10)
-            ax2.plot(axis_x[:], iter_acc[:], linewidth = 2, linestyle = '--',color ='b', label = '%d_acc' % T,marker = marker[iter],
-                     markersize = 10)
-    ax1.set_ylabel('loss')
-    ax2.set_ylabel('acc')
+            print(iter_acc)
+            ax1.plot(axis_x[:],iter_acc[:],linewidth=2,linestyle= '--',color =color[idx],label='%.1e_loss' % lamda,marker = marker[idx],
+                     markersize=4)
+                # ax2.plot(axis_x[:], iter_loss[:], linewidth = 2, linestyle = '--',color ='b', label = '%d_acc' % T,marker = marker[iter],
+                #          markersize = 10)
+    ax1.set_ylabel('acc')
+    # ax2.set_ylabel('loss')
     box = ax1.get_position()
     ax1.set_position([box.x0, box.y0 + box.height * 0.1,
                      box.width, box.height * 0.9])
@@ -281,14 +309,14 @@ def main(name):
     # Put a legend below current axis
     ax1.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
               fancybox=True, shadow=True, ncol=5)
-    box = ax2.get_position()
-    ax2.set_position([box.x0, box.y0 + box.height * 0.1,
-                      box.width, box.height * 0.9])
+    # box = ax2.get_position()
+    # ax2.set_position([box.x0, box.y0 + box.height * 0.1,
+    #                   box.width, box.height * 0.9])
 
     # Put a legend below current axis
-    ax2.legend(loc='upper center', bbox_to_anchor=(0.5, -0.16),
-               fancybox=True, shadow=True, ncol=5)
-    plt.savefig('%s_%s.png' % (name, 'loss_acc'))
+    # ax2.legend(loc='upper center', bbox_to_anchor=(0.5, -0.16),
+    #            fancybox=True, shadow=True, ncol=5)
+    plt.savefig('%s_%s.png' % (name, 'lamda_acc'))
     plt.show()
 
 

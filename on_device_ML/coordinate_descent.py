@@ -125,34 +125,54 @@ def label_processing(y,n_number):
 
 def optimization(x_value,y_temp,W,class_number):
     n_number, project_d = x_value.shape
-
+    lamda = 0.002
     #original optimization method 
     for c in range(class_number):
         W_temp = W[:,c]
         y_temp_c = y_temp[:,c]
         init= np.dot(x_value, W_temp )
         hinge_loss = sklearn.metrics.hinge_loss(y_temp_c, init)
-        loss_new = np.sum(hinge_loss)+ sum(abs(W_temp))
+        regularization = sum(abs(W_temp))*lamda
+        loss_new = np.sum(hinge_loss)+ regularization
         loss_old =  2*loss_new
         j = 0
         while (loss_old-loss_new)/loss_old >= 1e-6:
             loss_old = loss_new
-            for i in np.random.choice(project_d,project_d,replace=False):
-                if W_temp[i] !=0:
-                    derta = init-np.multiply(W_temp[i],x_value[:,i])
-                    loss = sklearn.metrics.hinge_loss(y_temp_c,derta)+ sum(abs(W_temp))*(10**(-j))
+            for i in np.random.choice(project_d, project_d, replace=False):
+                if W_temp[i] != 0:
+                    w_i = W_temp[i]
+                    w_i2 = -W_temp[i]
+                    derta = init - np.multiply(w_i, x_value[:, i])
+                    regularization -= lamda
+                    derta2 = init - 2 * np.multiply(w_i, x_value[:, i])
+                    regularization_2 = regularization + lamda
+                    loss = sklearn.metrics.hinge_loss(y_temp_c, derta) + regularization
                     if loss < loss_new:
                         loss_new = loss
                         init = derta
-                        W_temp[i] =0
+                        W_temp[i] = 0
+                    loss = sklearn.metrics.hinge_loss(y_temp_c, derta2) + regularization_2
+                    if loss < loss_new:
+                        loss_new = loss
+                        init = derta2
+                        W_temp[i] = w_i2
+                        regularization = regularization_2
                 else:
-                    w_i = np.sign(np.random.rand(1))
-                    derta = init+np.multiply(w_i,x_value[:,i])
-                    loss = sklearn.metrics.hinge_loss(y_temp_c,derta)+sum(abs(W_temp))*(10**(-j))
+                    derta = init + x_value[:, i]
+                    regularization += lamda
+                    derta2 = init - x_value[:, i]
+
+                    loss = sklearn.metrics.hinge_loss(y_temp_c, derta) + regularization
                     if loss < loss_new:
                         loss_new = loss
                         init = derta
-                        W_temp[i] =w_i
+                        W_temp[i] = 1
+                    loss = sklearn.metrics.hinge_loss(y_temp_c, derta2) + regularization
+                    if loss < loss_new:
+                        loss_new = loss
+                        init = derta2
+                        W_temp[i] = -1
+
             j +=1
         W[:,c] = W_temp
     return W
@@ -175,13 +195,14 @@ def main(name ):
     read data and parameter initialize for the hadamard transform
     '''
     x_train, y_train, x_test, y_test= get_data(name)
-    acc_linear = np.zeros(2)
-    acc_binary = np.zeros(2)
-    acc_random = np.zeros(2)
-    time_linear = np.zeros(2)
-    time_binary = np.zeros(2)
-    time_random = np.zeros(2)
-    for iter in range(2):
+    acc_linear = np.zeros(3)
+    acc_binary = np.zeros(3)
+    acc_random = np.zeros(3)
+    time_linear = np.zeros(3)
+    time_binary = np.zeros(3)
+    time_random = np.zeros(3)
+    non_zeros = np.zeros(3)
+    for iter in range(3):
         x,y = x_train,y_train
         n_number, f_num = np.shape(x)
         d = 2 ** math.ceil(np.log2(f_num))
@@ -216,6 +237,7 @@ def main(name ):
         W_fcP = np.asmatrix(np.sign(W_fcP.reshape(-1, class_number)))
         print(W_fcP.shape)
         W_fcP = optimization(x_value, y_temp, W_fcP, class_number)
+        non_zeros[iter] = np.count_nonzero(W_fcP)
 
         print('Training coordinate descent initiate from random')
         W_fcP_random = np.asmatrix(np.sign(np.random.random((T*d,class_number))))
@@ -251,6 +273,7 @@ def main(name ):
         time_random[iter] = time.time()-start+process_time
     print(np.mean(acc_linear),np.mean(acc_binary),np.mean(acc_random),'T number %d'%(T))
     print(np.mean(time_linear), np.mean(time_binary), np.mean(time_random),'T number %d'%(T))
+    print('number of non_zeros %d'%(np.mean(non_zeros)))
 
 
 if __name__ == '__main__':
