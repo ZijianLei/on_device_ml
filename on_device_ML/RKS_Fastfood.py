@@ -34,6 +34,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from extra_function import *
 import sklearn
+from sklearn.kernel_approximation import *
+from sklearn import *
 from scipy._lib._util import _asarray_validated
 from sklearn.utils import check_array, check_random_state
 from sklearn.exceptions import DataConversionWarning
@@ -41,35 +43,21 @@ import time
 
 
 def main(name ):
-    acc_1 = []
-    acc_2 = []
-    acc_3 = []
     print('start')
     '''
     read data and parameter initialize for the hadamard transform
     '''
     iteration = 3
-    T_number = [1, 2, 4, 8, 16,32]
-    # T_number = [8]
-    sigma_number = [2 ** 9, 2 ** 6, 2 ** 3, 1, 2 ** (-3), 2 ** (-6), 2 ** (-9)]
-    lambda_number = [1e3,1e2,1e1,1,0]
-    # lambda_number = [0]
+    sigma_number = [2**9,2**6,2**3,1,2**(-3),2**(-6),2**(-9)]
     acc_binary_1 = []
     acc_binary_2 = []
-    acc_binary_3 = []
-    non_zeros1 = []
-    non_zeros2 = []
-    non_zeros3 = []
-    method = FLAGS.method
+    T_number = [1,2,4,8,16,32]
     for T in T_number:
-
         for iter in range(iteration):
             x_train, y_train, x_test, y_test = get_data(name, FLAGS)
             x,y = x_train,y_train
             n_number, f_num = np.shape(x)
             d = 2 ** math.ceil(np.log2(f_num))
-
-            FLAGS.T = T
             G = np.random.randn(T * d)
             B = np.random.uniform(-1, 1, T * d)
             B[B > 0] = 1
@@ -93,85 +81,46 @@ def main(name ):
             FLAGS.b = np.random.uniform(0, 2 * math.pi, d * T)
             FLAGS.t = np.random.uniform(-1, 1, d * T)
             for si in sigma_number:
-                sigma = si*(T*d)
-                for lamb in lambda_number:
-                    print('Training Linear SVM')
-                    x, y = x_train, y_train
-                    FLAGS.T = T
-                    n_number, f_num = np.shape(x)
-                    FLAGS.BATCHSIZE = n_number
-                    y_temp = label_processing(y, n_number, FLAGS)
-                    W_fcP2  = np.asmatrix(np.sign(np.random.randn(d*T,class_number)))
-                    W_fcP = np.asmatrix(np.sign(np.random.randn(d *T,class_number)))
+                sigma = si
+                print('Training Linear SVM')
+                x, y = x_train, y_train
+                FLAGS.T = T
+                n_number, f_num = np.shape(x)
+                FLAGS.BATCHSIZE = n_number
+                x_value = np.asmatrix(fastfood(d, f_num, x, G, B, PI_value, S,FLAGS,sigma))
+                clf = LinearSVC()
+                clf.fit(x_value, y)
+                # clf0 = LinearSVC()
+                # x_kernel = metrics.pairwise.rbf_kernel(x)
+                # clf0.fit(x_kernel, y)
+
+                clf2 = LinearSVC()
+                rbf_feature = RBFSampler(gamma=sigma,random_state=1,n_components=T*d)
+                sampler = rbf_feature.fit(x)
+
+                x_value_rks = sampler.transform(x)
+                clf2.fit(x_value_rks, y)
 
 
-                    '''
-                    x_value0 is transformed based on sign(w^Tx)
-                    '''
+                '''
+                Start the test process
+                '''
+                x, y = x_test, y_test
+                n_number, f_num = np.shape(x)
+                FLAGS.BATCHSIZE = n_number
+                test_x = np.asmatrix(fastfood(d, f_num, x, G, B, PI_value, S,FLAGS,sigma))
+                test_x_rks = sampler.transform(x)
+                # x_kernel = metrics.pairwise.rbf_kernel(x)
+                # print(clf0.score(x_kernel,y))
+                acc_binary_1.append(clf.score(test_x,y))
+                acc_binary_2.append(clf2.score(test_x_rks,y))
 
-                    if method == 1:
-                        x_value0 = np.asmatrix(hadamard2(d, f_num, x, G, B, PI_value, S, FLAGS))
-                        clf = LinearSVC()
-                        clf.fit(x_value0, y)
-                        # W_fcP = np.asmatrix(np.sign(W_fcP.reshape(-1, class_number)))
-                        # W_fcP = optimization(x_value0, y_temp, W_fcP, class_number, lamb)
+    acc_binary_1 = np.array(acc_binary_1).reshape(6,-1)
+    acc_binary_2 = np.array(acc_binary_2).reshape(6,-1)
 
-                    if method == 2:
-                        x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S, FLAGS, sigma))
-                        W_fcP2 = optimization(x_value, y_temp, W_fcP2, class_number, lamb)
-                    if method == 3:
-                        x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S, FLAGS, sigma))
-                        clf = LinearSVC()
-                        clf.fit(x_value, y)
-                        W_fcP3 = optimization2(clf.coef_, class_number)
+    np.save('%s_RKS' % name, acc_binary_1)
+    np.save('%s_Fastfood'%name,acc_binary_2)
 
-
-                    '''
-                    Start the test process
-                    '''
-                    x, y = x_test, y_test
-                    n_number, f_num = np.shape(x)
-                    test_y = label_processing(y,n_number,FLAGS)
-                    FLAGS.BATCHSIZE = n_number
-
-
-                    # start = time.time()
-
-
-                    if method == 1:
-                        test_x0 = np.asmatrix(hadamard2(d, f_num, x, G, B, PI_value, S, FLAGS))
-                        acc_binary_1.append(clf.score(test_x0,y))
-                        # acc_binary_1.append(predict_acc(x_value0,y_train,test_x0,y_test,W_fcP,class_number) )
-                        # non_zeros1.append(np.count_nonzero(W_fcP))
-
-                    if method == 2:
-                        test_x = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S, FLAGS, sigma))
-                        acc_binary_2.append(predict_acc(x_value,y_train,test_x,y_test,W_fcP2,class_number) )
-                        non_zeros2.append(np.count_nonzero(W_fcP2))
-
-                    if method == 3:
-                        test_x = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S, FLAGS, sigma))
-                        acc_binary_3.append(predict_acc(x_value, y_train, test_x, y_test, W_fcP3, class_number))
-                        non_zeros3.append(np.count_nonzero(W_fcP3))
-                # print(acc_binary_1,acc_binary_2,acc_binary_3,non_zeros1,non_zeros2,non_zeros3)
-    # exit()
-    if method ==1:
-        acc_binary_1 = np.array(acc_binary_1).reshape(6,-1)
-        # non_zeros1 = np.array(non_zeros1).reshape(6, -1)
-        # np.save('%s_non0_sign' % name, non_zeros1)
-        np.save('%s_sign' % name, acc_binary_1)
-
-    if method == 2:
-        acc_binary_2 = np.array(acc_binary_2).reshape(6,-1)
-        non_zeros2 = np.array(non_zeros2).reshape(6, -1)
-        np.save('%s_non0_random_init' % name, non_zeros2)
-        np.save('%s_random_init' % name, acc_binary_2)
-
-    if method ==3:
-        acc_binary_3 = np.array(acc_binary_3).reshape(6,-1)
-        non_zeros3 = np.array(non_zeros3).reshape(6, -1)
-        np.save('%s_non0_cos_similarity' % name, non_zeros3)
-        np.save('%s_svm_cos_similarity' %name, acc_binary_3)
 
 
 if __name__ == '__main__':
@@ -207,9 +156,7 @@ if __name__ == '__main__':
     parser.add_argument('-d_libsvm', type=str,
                         default=None,
                         help='using data from libsvm dataset with data is well preprocessed')
-    parser.add_argument('-method', type=int,
-                        default=2,
-                        help='using data from libsvm dataset with data is well preprocessed')
+
 
     np.set_printoptions(threshold=np.inf, suppress=True)
     FLAGS, unparsed = parser.parse_known_args()
