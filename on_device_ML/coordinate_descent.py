@@ -1,26 +1,3 @@
-# Copyright 2011 The TensorFlow Authors. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
-
-"""A deep MNIST classifier using convolutional layers.
-See extensive documentation at
-https://www.tensorflow.org/get_started/mnist/pros
-"""
-# Disable linter warnings to maintain consistency with tutorial.
-# pylint: disable=invalid-name
-# pylint: disable=g-bad-import-order
-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -29,40 +6,28 @@ import os
 import argparse
 from memory_profiler import profile
 import  warnings
-import ffht
-import matplotlib.pyplot as plt
+import time
 import numpy as np
 from extra_function import *
-import sklearn
-from scipy._lib._util import _asarray_validated
-from sklearn.utils import check_array, check_random_state
-from sklearn.exceptions import DataConversionWarning
-import time
-
 
 def main(name ):
-    acc_1 = []
-    acc_2 = []
-    acc_3 = []
-    print('start')
-    '''
-    read data and parameter initialize for the hadamard transform
-    '''
     iteration = 3
-    T_number = [1, 2, 4, 8, 16,32]
-    # T_number = [8]
-    sigma_number = [2 ** 9, 2 ** 6, 2 ** 3, 1, 2 ** (-3), 2 ** (-6), 2 ** (-9)]
-    lambda_number = [1e3,1e2,1e1,1,0]
-    # lambda_number = [0]
+    # T_number = [1, 2, 4, 8, 16,32]
+    T_number = [8]
+    # sigma_number = [2**10,2**9,2 ** 8,2**7, 2 ** 6, 2**5,2 ** 4,2**3.2**(-1)]
+    sigma_number = [20,24,28,32]
+    lambda_number = [1e1,1,0.1,0]
     acc_binary_1 = []
+    acc_binary_1_sign = []
+    acc_binary_2_linear = []
     acc_binary_2 = []
     acc_binary_3 = []
     non_zeros1 = []
     non_zeros2 = []
     non_zeros3 = []
     method = FLAGS.method
+    hinge_loss2 = []
     for T in T_number:
-
         for iter in range(iteration):
             x_train, y_train, x_test, y_test = get_data(name, FLAGS)
             x,y = x_train,y_train
@@ -92,40 +57,58 @@ def main(name ):
             # if method !=0:
             FLAGS.b = np.random.uniform(0, 2 * math.pi, d * T)
             FLAGS.t = np.random.uniform(-1, 1, d * T)
+
             for si in sigma_number:
-                sigma = si*(T*d)
+                sigma = si
+                x, y = x_train, y_train
+                FLAGS.T = T
+                n_number, f_num = np.shape(x)
+                FLAGS.BATCHSIZE = n_number
+                y_temp = label_processing(y, n_number, FLAGS)
+                if method == 1:
+
+                    x_ = np.pad(x, ((0, 0), (0, d - x.shape[1])), 'constant', constant_values=(0, 0))
+                    V = np.random.randn(d, d * T)
+                    x_value0 = np.sign(np.dot(x_, V))
+                    # x_value0 = np.asmatrix(hadamard2(d, f_num, x, G, B, PI_value, S, FLAGS))
+                    clf = LinearSVC(dual = False)
+                    clf.fit(x_value0, y)
+
+                    # W_fcP = np.asmatrix(np.sign(np.random.randn(d * T, class_number)))
+
+                if method == 2:
+                    x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S, FLAGS, sigma))
+                    clf = LinearSVC(dual = False)
+                    clf.fit(x_value, y)
+
                 for lamb in lambda_number:
-                    print('Training Linear SVM')
+                    '''
+                    x_value0 is transformed based on sign(w^Tx)
+                    '''
                     x, y = x_train, y_train
                     FLAGS.T = T
                     n_number, f_num = np.shape(x)
                     FLAGS.BATCHSIZE = n_number
                     y_temp = label_processing(y, n_number, FLAGS)
-                    W_fcP2  = np.asmatrix(np.sign(np.random.randn(d*T,class_number)))
-                    W_fcP = np.asmatrix(np.sign(np.random.randn(d *T,class_number)))
-
-
-                    '''
-                    x_value0 is transformed based on sign(w^Tx)
-                    '''
-
                     if method == 1:
-                        x_value0 = np.asmatrix(hadamard2(d, f_num, x, G, B, PI_value, S, FLAGS))
-                        clf = LinearSVC()
-                        clf.fit(x_value0, y)
                         # W_fcP = np.asmatrix(np.sign(W_fcP.reshape(-1, class_number)))
-                        # W_fcP = optimization(x_value0, y_temp, W_fcP, class_number, lamb)
+                        # W_fcP = np.asmatrix(np.sign(np.random.randn(d * T, class_number)))
+                        W_fcP = np.asmatrix(np.sign(clf.coef_).T)
+                        W_fcP = optimization(x_value0, y_temp, W_fcP, class_number, lamb)
 
                     if method == 2:
-                        x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S, FLAGS, sigma))
+                        # for c in range(class_number):
+                        #     index_x = np.where(y_temp[:, c] == 1)
+                        #     W_fcP2[:, c] = np.asmatrix(np.sign(np.sum(x_value[index_x])))
+                        # W_fcP = np.asmatrix(np.sign(W_fcP.reshape(-1, class_number)))
+                        # W_fcP2 = np.asmatrix(np.sign(np.random.randn(d * T, class_number)))
+                        W_fcP2 = np.asmatrix(np.sign(clf.coef_).T)
                         W_fcP2 = optimization(x_value, y_temp, W_fcP2, class_number, lamb)
-                    if method == 3:
-                        x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S, FLAGS, sigma))
-                        clf = LinearSVC()
-                        clf.fit(x_value, y)
-                        W_fcP3 = optimization2(clf.coef_, class_number)
-
-
+                    # if method == 3:
+                    #     x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S, FLAGS, sigma))
+                    #     clf = LinearSVC()
+                    #     clf.fit(x_value, y)
+                    #     W_fcP3 = optimization2(clf.coef_, class_number)
                     '''
                     Start the test process
                     '''
@@ -139,33 +122,45 @@ def main(name ):
 
 
                     if method == 1:
-                        test_x0 = np.asmatrix(hadamard2(d, f_num, x, G, B, PI_value, S, FLAGS))
-                        acc_binary_1.append(clf.score(test_x0,y))
+                        # test_x0 = np.asmatrix(hadamard2(d, f_num, x, G, B, PI_value, S, FLAGS))
+                        x_ = np.pad(x, ((0, 0), (0, d - x.shape[1])), 'constant', constant_values=(0, 0))
+                        # V = np.random.randn(d, d * T)
+                        test_x0 = np.sign(np.dot(x_, V))
+
+                        acc_binary_1_sign.append(predict_acc(x_value0, y_train, test_x0, y_test, W_fcP, class_number))
                         # acc_binary_1.append(predict_acc(x_value0,y_train,test_x0,y_test,W_fcP,class_number) )
                         # non_zeros1.append(np.count_nonzero(W_fcP))
 
                     if method == 2:
                         test_x = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S, FLAGS, sigma))
                         acc_binary_2.append(predict_acc(x_value,y_train,test_x,y_test,W_fcP2,class_number) )
+                #         print(acc_binary_2)
                         non_zeros2.append(np.count_nonzero(W_fcP2))
-
-                    if method == 3:
-                        test_x = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S, FLAGS, sigma))
-                        acc_binary_3.append(predict_acc(x_value, y_train, test_x, y_test, W_fcP3, class_number))
-                        non_zeros3.append(np.count_nonzero(W_fcP3))
+                #     if method == 3:
+                #         test_x = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S, FLAGS, sigma))
+                #         acc_binary_3.append(predict_acc(x_value, y_train, test_x, y_test, W_fcP3, class_number))
+                #         non_zeros3.append(np.count_nonzero(W_fcP3))
                 # print(acc_binary_1,acc_binary_2,acc_binary_3,non_zeros1,non_zeros2,non_zeros3)
-    # exit()
+                if method ==1:
+                    acc_binary_1.append(clf.score(test_x0, y))
+                if method ==2:
+                    acc_binary_2_linear.append(clf.score(test_x, y_test))
+    print(np.mean(np.array(acc_binary_2).reshape(3,-1),axis = 0),acc_binary_2_linear)
+    exit()
     if method ==1:
-        acc_binary_1 = np.array(acc_binary_1).reshape(6,-1)
+        acc_binary_1 = np.array(acc_binary_1)
         # non_zeros1 = np.array(non_zeros1).reshape(6, -1)
         # np.save('%s_non0_sign' % name, non_zeros1)
         np.save('%s_sign' % name, acc_binary_1)
+        np.save('%s_sign_sign' % name, acc_binary_1_sign)
 
     if method == 2:
-        acc_binary_2 = np.array(acc_binary_2).reshape(6,-1)
-        non_zeros2 = np.array(non_zeros2).reshape(6, -1)
+        acc_binary_2 = np.array(acc_binary_2)
+        non_zeros2 = np.array(non_zeros2)
+        acc_binary_2_linear = np.array(acc_binary_2_linear)
         np.save('%s_non0_random_init' % name, non_zeros2)
         np.save('%s_random_init' % name, acc_binary_2)
+        np.save('%s_random_init_linear' % name, acc_binary_2_linear)
 
     if method ==3:
         acc_binary_3 = np.array(acc_binary_3).reshape(6,-1)
@@ -209,7 +204,7 @@ if __name__ == '__main__':
                         help='using data from libsvm dataset with data is well preprocessed')
     parser.add_argument('-method', type=int,
                         default=2,
-                        help='using data from libsvm dataset with data is well preprocessed')
+                        help='using data from openml dataset with data is well preprocessed')
 
     np.set_printoptions(threshold=np.inf, suppress=True)
     FLAGS, unparsed = parser.parse_known_args()

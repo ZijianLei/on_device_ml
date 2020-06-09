@@ -47,11 +47,13 @@ def main(name ):
     '''
     read data and parameter initialize for the hadamard transform
     '''
-    iteration = 3
+    iteration = 1
     sigma_number = [2**9,2**6,2**3,1,2**(-3),2**(-6),2**(-9)]
+    # sigma_number = [2 ** 6, 2 ** 5, 2 ** 4, 2 ** 3]
     acc_binary_1 = []
     acc_binary_2 = []
-    T_number = [1,2,4,8,16,32]
+    T_number = [32]
+    T_number = [1, 2, 4, 8, 16, 32]
     for T in T_number:
         for iter in range(iteration):
             x_train, y_train, x_test, y_test = get_data(name, FLAGS)
@@ -88,13 +90,13 @@ def main(name ):
                 n_number, f_num = np.shape(x)
                 FLAGS.BATCHSIZE = n_number
                 x_value = np.asmatrix(fastfood(d, f_num, x, G, B, PI_value, S,FLAGS,sigma))
-                clf = LinearSVC()
+                clf = LinearSVC(dual = False)
                 clf.fit(x_value, y)
                 # clf0 = LinearSVC()
                 # x_kernel = metrics.pairwise.rbf_kernel(x)
                 # clf0.fit(x_kernel, y)
 
-                clf2 = LinearSVC()
+                clf2 = LinearSVC(dual = False)
                 rbf_feature = RBFSampler(gamma=sigma,random_state=1,n_components=T*d)
                 sampler = rbf_feature.fit(x)
 
@@ -115,11 +117,10 @@ def main(name ):
                 acc_binary_1.append(clf.score(test_x,y))
                 acc_binary_2.append(clf2.score(test_x_rks,y))
 
-    acc_binary_1 = np.array(acc_binary_1).reshape(6,-1)
-    acc_binary_2 = np.array(acc_binary_2).reshape(6,-1)
-
-    np.save('%s_RKS' % name, acc_binary_1)
-    np.save('%s_Fastfood'%name,acc_binary_2)
+    acc_binary_1 = np.array(acc_binary_1)
+    acc_binary_2 = np.array(acc_binary_2)
+    np.save('%s_Fastfood_8' %name, acc_binary_1)
+    np.save('%s_RKS_8'%name,acc_binary_2)
 
 
 

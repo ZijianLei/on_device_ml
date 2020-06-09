@@ -1,7 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="8a7ceedf-fa11-4620-8c57-addaa9753aad" name="Default Changelist" comment="" />
+    <list default="true" id="8a7ceedf-fa11-4620-8c57-addaa9753aad" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/acc_memory.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/compare_init.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/memory_cost.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/LSBC.py" beforeDir="false" afterPath="$PROJECT_DIR$/LSBC.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/RKS_Fastfood.py" beforeDir="false" afterPath="$PROJECT_DIR$/RKS_Fastfood.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/auto_print.py" beforeDir="false" afterPath="$PROJECT_DIR$/auto_print.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/compare_w.py" beforeDir="false" afterPath="$PROJECT_DIR$/compare_w.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/coordinate_descent.py" beforeDir="false" afterPath="$PROJECT_DIR$/coordinate_descent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extra_function.py" beforeDir="false" afterPath="$PROJECT_DIR$/extra_function.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/kernel_distance.py" beforeDir="false" afterPath="$PROJECT_DIR$/kernel_distance.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/non_zero_acc.py" beforeDir="false" afterPath="$PROJECT_DIR$/non_zero_acc.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/result_analysis.py" beforeDir="false" afterPath="$PROJECT_DIR$/result_analysis.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test.py" beforeDir="false" afterPath="$PROJECT_DIR$/test.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../paper note" beforeDir="false" afterPath="$PROJECT_DIR$/../paper note" afterDir="false" />
+    </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -46,20 +63,30 @@
           <entry key="project.open.time.0" value="1" />
           <entry key="project.open.time.2" value="2" />
           <entry key="project.open.time.3" value="3" />
-          <entry key="project.opened" value="6" />
+          <entry key="project.open.time.4" value="1" />
+          <entry key="project.opened" value="7" />
         </counts>
       </usages-collector>
     </session>
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file pinned="false" current-in-tab="true">
+      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/coordinate_descent.py">
           <provider selected="true" editor-type-id="text-editor">
             <state relative-caret-position="323">
-              <caret line="184" column="34" lean-forward="true" selection-start-line="184" selection-start-column="34" selection-end-line="184" selection-end-column="34" />
+              <caret line="184" column="34" selection-start-line="184" selection-start-column="34" selection-end-line="184" selection-end-column="34" />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/extra_function.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="272">
+              <caret line="49" column="63" lean-forward="true" selection-start-line="49" selection-start-column="63" selection-end-line="49" selection-end-column="63" />
               <folding>
-                <element signature="e#964#1002#0" expanded="true" />
+                <element signature="e#0#35#0" expanded="true" />
               </folding>
             </state>
           </provider>
@@ -71,6 +98,9 @@
     <findStrings>
       <find>logs</find>
     </findStrings>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/.." />
   </component>
   <component name="IdeDocumentHistory">
     <option name="CHANGED_PATHS">
@@ -86,16 +116,18 @@
     <sorting>DEFINITION_ORDER</sorting>
   </component>
   <component name="ProjectFrameBounds" extendedState="6">
-    <option name="x" value="112" />
-    <option name="y" value="94" />
-    <option name="width" value="1058" />
-    <option name="height" value="829" />
+    <option name="x" value="111" />
+    <option name="y" value="93" />
+    <option name="width" value="1059" />
+    <option name="height" value="830" />
   </component>
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
   <component name="ProjectView">
     <navigator proportions="" version="1">
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
+      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -107,7 +139,6 @@
           <select />
         </subPane>
       </pane>
-      <pane id="Scope" />
     </panes>
   </component>
   <component name="PropertiesComponent">
@@ -157,9 +188,10 @@
     </todo-panel>
   </component>
   <component name="ToolWindowManager">
-    <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
+    <frame x="-7" y="-7" width="1550" height="838" extended-state="6" />
+    <editor active="true" />
     <layout>
-      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.26599148" />
+      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.269437" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
@@ -168,7 +200,7 @@
       <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
-      <window_info anchor="bottom" id="TODO" order="6" visible="true" weight="0.329718" />
+      <window_info anchor="bottom" id="TODO" order="6" visible="true" weight="0.32907802" />
       <window_info anchor="bottom" id="Docker" order="7" show_stripe_button="false" />
       <window_info anchor="bottom" id="Version Control" order="8" show_stripe_button="false" />
       <window_info anchor="bottom" id="Database Changes" order="9" show_stripe_button="false" />
@@ -203,9 +235,16 @@
     <entry file="file://$PROJECT_DIR$/coordinate_descent.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="323">
-          <caret line="184" column="34" lean-forward="true" selection-start-line="184" selection-start-column="34" selection-end-line="184" selection-end-column="34" />
+          <caret line="184" column="34" selection-start-line="184" selection-start-column="34" selection-end-line="184" selection-end-column="34" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/extra_function.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="272">
+          <caret line="49" column="63" lean-forward="true" selection-start-line="49" selection-start-column="63" selection-end-line="49" selection-end-column="63" />
           <folding>
-            <element signature="e#964#1002#0" expanded="true" />
+            <element signature="e#0#35#0" expanded="true" />
           </folding>
         </state>
       </provider>

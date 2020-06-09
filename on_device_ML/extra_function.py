@@ -15,7 +15,9 @@ from scipy.stats import chi
 import sklearn
 import copy
 from scipy.spatial.distance import cosine
+from sklearn.model_selection import KFold
 from scipy._lib._util import _asarray_validated
+import gc
 from sklearn.utils import check_array, check_random_state
 def get_data(name,FLAGS):
     if FLAGS.d_openml != None:
@@ -34,6 +36,10 @@ def get_data(name,FLAGS):
         if name == 'webspam' or 'covtype':
             X,y = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" %(name,'train'))
             x_train, x_test, y_train, y_test = train_test_split(X, y, test_size = 0.2)
+        elif name == 'usps':
+            x_train, y_train = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" % (name, 'usps'))
+
+            x_test, y_test = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" % (name, 'usps.t'))
         else:
             x_train,y_train = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" %(name,'train'))
             x_test,y_test = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" % (name, 'test'))
@@ -44,8 +50,9 @@ def get_data(name,FLAGS):
         # x_test = np.pad(x_test, ((0, 0), (0, f_num - x_test.shape[1])), 'constant', constant_values=(0, 0))
         # x_train =scaler.transform(x_train)
         # x_test = scaler.transform(x_test)
-
-        # print(x_train.shape)
+    move = np.max(x_train)+np.min(x_train)
+    x_train = 2*x_train-move
+    x_test = 2*x_test-move
     return x_train,y_train,x_test,y_test
 
 def fastfood_value(n_number,T,d,FLAGS,method = 1 ):
@@ -104,37 +111,42 @@ def fastfood(d,f_num,batch,G,B,PI_value,S,FLAGS,sigma = 1):
 def hadamard(d,f_num,batch,G,B,PI_value,S,FLAGS,sigma = 1):
     start = time.time()
     T = FLAGS.T
+    kf = KFold(n_splits=2)
+    x_return = np.zeros((1,T*d))
+    for train_index,test_index in kf.split(batch):
+        x_ = batch[test_index]
+        # print(x_.shape)
+        n = x_.shape[0]
+          # x.shape [batch,d]
+        x_ = np.pad(x_, ((0, 0), (0, d - x_.shape[1])), 'constant', constant_values=(0, 0))
+        x_ = np.tile(x_, (1, T))
+        x_i = np.multiply(x_, S)
+        x_ = x_i.reshape(n * T, d)
+        for i in range(n*T):
+            ffht.fht(x_[i])
+        x_ = x_.reshape(n, T * d)
+        x_transformed = np.multiply(x_, G)
+        np.take(x_, PI_value, axis=1, mode='wrap', out=x_)
 
-    x_ = batch
-    n = x_.shape[0]
-      # x.shape [batch,d]
-    x_ = np.pad(x_, ((0, 0), (0, d - x_.shape[1])), 'constant', constant_values=(0, 0))
-    x_ = np.tile(x_, (1, T))
-    x_i = np.multiply(x_, S)
-    x_ = x_i.reshape(FLAGS.BATCHSIZE * T, d)
-    for i in range(n*T):
-        ffht.fht(x_[i])
-    x_ = x_.reshape(FLAGS.BATCHSIZE, T * d)
-    x_transformed = np.multiply(x_, G)
-    np.take(x_, PI_value, axis=1, mode='wrap', out=x_)
+        x_ = np.reshape(x_transformed, (n * T, d))
+        for i in range(n*T):
+            ffht.fht(x_[i])
+        x_ = x_.reshape(n, T * d)
+        # print(np.linalg.norm(x_[:2],axis=1))
+        # print(np.mean(x_[:,:2], axis=0))
+        x_value = np.multiply(x_, B)
+        # print(np.linalg.norm(x_value[:2], axis=1))
 
-    x_ = np.reshape(x_transformed, (FLAGS.BATCHSIZE * T, d))
-    for i in range(n*T):
-        ffht.fht(x_[i])
-    x_ = x_.reshape(FLAGS.BATCHSIZE, T * d)
-    # print(np.linalg.norm(x_[:2],axis=1))
-    # print(np.mean(x_[:,:2], axis=0))
-    x_value = np.multiply(x_, B)
-    # print(np.linalg.norm(x_value[:2], axis=1))
+        # print(np.any(FLAGS.b))
+        if np.any(FLAGS.b) :
+            # print(1)
+            x_value = x_value / (sigma *T* d)
+            x_value = np.cos(x_value+FLAGS.b)+FLAGS.t
+        # print(time.time()-start)
+        x_value = np.sign(x_value)
+        x_return = np.vstack((x_return,x_value))
 
-    # print(np.any(FLAGS.b))
-    if np.any(FLAGS.b) :
-        # print(1)
-        x_value = x_value / (sigma * np.sqrt(d))
-        x_value = np.cos(x_value+FLAGS.b)+FLAGS.t
-    # print(time.time()-start)
-    x_value = np.sign(x_value)
-    return x_value
+    return x_return[1:,:]
 
 def hadamard2(d,f_num,batch,G,B,PI_value,S,FLAGS):
 
@@ -196,6 +208,7 @@ def label_processing(y,n_number,FLAGS):
                 y_temp = np.where(y[:] != i, -1, 1).reshape(n_number, 1)
                 y_0 = np.hstack((y_0, y_temp))
             y_temp = y_0[:, 1:]
+    # print(y_temp.shape)
     return y_temp
 
 def optimization2(init_W,class_number):
@@ -248,8 +261,9 @@ def optimization(x_value,y_temp,W,class_number,lamda = 0):
     x_value = np.asmatrix(x_value)
     lamda = lamda/project_d
     for c in range(class_number):
+        # print(c)
         W_temp = np.asmatrix(W[:,c])
-        y_temp_c = np.asmatrix(y_temp[:,c]).T
+        y_temp_c = np.asmatrix(y_temp[:,c]).reshape(-1,1)
         # print(y_temp_c.shape,x_value.shape,W_temp.shape)
         temp_store = x_value.dot(W_temp)
         # print(temp_store.shape,y_temp_c.shape)
@@ -261,7 +275,103 @@ def optimization(x_value,y_temp,W,class_number,lamda = 0):
         j = 0
         while (loss_old-loss_new)/loss_old >= 1e-6:
             loss_old = loss_new
+            for i in range(project_d):
+                if W_temp[i] != 0:
+                    w_i = W_temp[i]
+                    w_i2 = -W_temp[i]
+                    temp = np.multiply(y_temp_c,x_value[:,i]*w_i)
+                    derta = init + temp
+                    regularization -= lamda
+                    derta2 = init + 2 * temp
+                    regularization_2 = regularization + lamda
+                    loss = np.sum(np.clip(derta,0,None))/n_number + regularization
+                    if loss < loss_new:
+                        loss_new = loss
+                        init = derta
+                        W_temp[i] = 0
+                    loss = np.sum(np.clip(derta2,0,None))/n_number + regularization_2
+                    if loss < loss_new:
+                        loss_new = loss
+                        init = derta2
+                        W_temp[i] = w_i2
+                        regularization = regularization_2
+
+                else:
+                    temp = np.multiply(y_temp_c,x_value[:, i])
+                    derta = init - temp # change to 1
+                    regularization += lamda
+                    derta2 = init + temp # change to -1
+
+                    loss = np.sum(np.clip(derta, 0, None)) / n_number + regularization
+                    if loss < loss_new:
+                        loss_new = loss
+                        init = derta
+                        W_temp[i] = 1
+                    loss = np.sum(np.clip(derta2,0,None))/n_number  + regularization
+                    if loss < loss_new:
+                        loss_new = loss
+                        init = derta2
+                        W_temp[i] = -1
+            j +=1
+        W[:,c] = W_temp
+    return W
+def binary_optimization(x_value,y_temp,W,class_number,lamda):
+    n_number, project_d = x_value.shape
+    #original optimization method
+    x_value = np.asmatrix(x_value)
+    lamda = lamda / project_d
+    for c in range(class_number):
+        W_temp = np.asmatrix(W[:, c])
+        y_temp_c = np.asmatrix(y_temp[:, c]).reshape(-1, 1)
+        temp_store = x_value.dot(W_temp)
+        init = 1 - np.multiply(y_temp_c, temp_store)
+        hinge_loss = np.sum(np.clip(init, 0, None)) / n_number
+        regularization = np.count_nonzero(W_temp) * lamda
+        loss_new = np.sum(hinge_loss)
+        loss_old = 2 * loss_new
+        while (loss_old-loss_new)/loss_old >= 1e-6:
+            loss_old = loss_new
             for i in np.random.choice(project_d, project_d, replace=False):
+                if W_temp[i] != 0:
+                    w_i = W_temp[i]
+                    w_i2 = -W_temp[i]
+                    temp = np.multiply(y_temp_c,x_value[:,i]*w_i)
+                    derta2 = init + 2 * temp
+                    loss = np.sum(np.clip(derta2,0,None))/n_number+regularization
+                    if loss < loss_new:
+                        loss_new = loss
+                        init = derta2
+                        W_temp[i] = w_i2
+        W[:,c] = W_temp
+    return W
+
+
+
+
+def compare_init_optimization(x_value,y_temp,W,class_number,lamda = 0):
+    # print('Training coordinate descent initiate from result of linear svm')
+    n_number, project_d = x_value.shape
+    #original optimization method
+    loss_result = []
+    x_value = np.asmatrix(x_value)
+    lamda = lamda/project_d
+    for c in range(class_number):
+        W_temp = np.asmatrix(W[:,c])
+        y_temp_c = np.asmatrix(y_temp[:,c]).T
+        # print(y_temp_c.shape,x_value.shape,W_temp.shape)
+        temp_store = x_value.dot(W_temp)
+        # print(temp_store.shape,y_temp_c.shape)
+        init= 1-np.multiply(y_temp_c,temp_store)
+        hinge_loss = np.sum(np.clip(init,0,None))/n_number
+        regularization = np.count_nonzero(W_temp)*lamda
+        loss_new = np.sum(hinge_loss)+ regularization
+        loss_old =  2*loss_new
+        j = 0
+        loss_result.append(loss_new)
+        while loss_old!=loss_new:
+            loss_old = loss_new
+            # for i in np.random.choice(project_d, project_d, replace=False):
+            for i in range(project_d):
                 if W_temp[i] != 0:
                     w_i = W_temp[i]
                     w_i2 = -W_temp[i]
@@ -299,36 +409,16 @@ def optimization(x_value,y_temp,W,class_number,lamda = 0):
                         W_temp[i] = -1
             # print(np.count_nonzero(W_temp))
             j +=1
+            loss_result.append(loss_new)
         W[:,c] = W_temp
-    return W
+    return W,loss_result
 
-def binary_optimization(x_value,y_temp,W,class_number):
-    n_number, project_d = x_value.shape
-    #original optimization method
-    for c in range(class_number):
-        W_temp = W[:,c]
-        y_temp_c = y_temp[:,c]
-        init= np.dot(x_value, W_temp )
-        hinge_loss = sklearn.metrics.hinge_loss(y_temp_c, init)
-        loss_new = np.sum(hinge_loss)
-        loss_old =  2*loss_new
-        j = 0
-        while (loss_old-loss_new)/loss_old >= 1e-6:
-            loss_old = loss_new
-            for i in np.random.choice(project_d, project_d, replace=False):
-                w_i = W_temp[i]
-                derta = init - 2*np.multiply(w_i, x_value[:, i])
-                loss = sklearn.metrics.hinge_loss(y_temp_c, derta)
-                if loss < loss_new:
-                    loss_new = loss
-                    init = derta
-                    W_temp[i] = - w_i
-            j +=1
-        W[:,c] = W_temp
-    return W
+
 
 def predict_acc(x_value,y_temp,test_x,test_y,W,class_number):
-    clf2 = LinearSVC()
+    clf2 = LinearSVC(dual = False)
+    # print(type(x_value),type(W))
+    # print(np.dot(x_value, W).shape, y_temp.shape)
     clf2.fit(np.dot(x_value, W), y_temp)
     acc = clf2.score(np.dot(test_x, W), test_y)
     # if class_number != 1:

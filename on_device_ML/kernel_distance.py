@@ -20,15 +20,17 @@ def main(name ):
     n_number, f_num = np.shape(x)
     d = 2 ** math.ceil(np.log2(f_num))
     T = 8
-    V = np.random.randn(f_num,d*T)
+    V = np.random.randn(f_num,d*T)*0.5
+    x = x/2
     kernel  = metrics.pairwise.rbf_kernel(x[:500])
     distance = euclidean_distances(x[:500])
     PI_value, G, B, S = fastfood_value(500,T,d,FLAGS)
     print('plot')
     # FLAGS.b = np.random.uniform(0, 2 * math.pi, d * T)
     # FLAGS.t = np.random.uniform(-1, 1, d * T)
-    x_value = hadamard(d, f_num, x[:500], G, B, PI_value, S, FLAGS,sigma = 0.5*n_number) # the resukt of Fastfood-ocs
+    x_value = hadamard(d, f_num, x[:500], G, B, PI_value, S, FLAGS,sigma = 10) # the resukt of Fastfood-ocs
     distance2 = np.dot(x_value[:500],x_value[:500].T)/(d*T)
+    print(np.min(distance2))
     # distance2 = dist.pairwise(x_value[:500])
     # print(distance2.shape)
     FLAGS.b  = None
@@ -36,19 +38,19 @@ def main(name ):
     distance_sign = np.dot(x_value2,x_value2.T)/(d*T)
     # distance2 = np.dot(x_temp[:500], x_temp[:500].T)/np.max(np.dot(x_temp[:500], x_temp[:500].T))
     # plt.scatter(distance[:, :], distance2[:, :], zorder=15, s=1)
-    plt.scatter(np.triu(distance[:,:]),np.triu(kernel[:,:]),zorder=30,s=5,label = r'rbf kernel $k(x,y)$') # the result of rbf-kernel
-    rbf_feature = RBFSampler(gamma=1/d, random_state=1, n_components=f_num)
+    plt.scatter(np.triu(distance[:,:]),np.triu(kernel[:,:]),zorder=30,s=5,label = r'rbf kernel') # the result of rbf-kernel
+    rbf_feature = RBFSampler(gamma=1/d, random_state=1, n_components=(d*T))
     x_rks =np.sign( rbf_feature.fit_transform(x[:500]))
     # x_rks = sklearn.preprocessing.normalize(x_rks,axis=1)
-    distance3 = np.dot(x_rks,x_rks.T)/f_num
+    distance3 = np.dot(x_rks,x_rks.T)/(d*T)
     x_sign = np.sign(np.dot(x[:500],V))
     distance4 = np.array(np.dot(x_sign[:500],x_sign[:500].T)/(d*T))
     # print(type(distance4),type(distance))
-    plt.scatter(np.triu(distance[:, :]), np.triu(distance4[:,:]), zorder=15, s=5, label='sign(Vx)')
-    plt.scatter(np.triu(distance[:,:]),np.triu(distance3[:,:]),zorder=15,s=5,label = r'LSBC')
+    # plt.scatter(np.triu(distance[:, :]), np.triu(distance4[:,:]), zorder=5, s=5, label='BJLE')
+    plt.scatter(np.triu(distance[:,:]),np.triu(distance3[:,:]),zorder=15,s=5,label = r'BCSIK')
     # plt.scatter(distance[:, :], distance_sign[:, :], zorder=5, s=5, label=r'sign(Vx)')
 
-    plt.scatter(np.triu(distance[:, :]), np.triu(distance2[:, :]), zorder=20, s=5, label=r'Our Proposed $\frac{1}{n}(z_xz_y)$')
+    plt.scatter(np.triu(distance[:, :]), np.triu(distance2[:, :]), zorder=10, s=5, label=r'Our Method')
 
     # FLAGS.b = None
     # x_value = hadamard(d, f_num, x, G, B, PI_value, S, FLAGS,sigma = 1/n_number)
@@ -56,10 +58,14 @@ def main(name ):
     # plt.scatter(distance[:, :], distance2[:, :],zorder=10,s=1)
     # distance2 = np.dot(x_temp[:500], x_temp[:500].T) / (d * T)
     # plt.scatter(distance[:, :], distance2[:, :], zorder=15, linewidths=1)
-    plt.legend()
-    plt.ylabel('kernel value')
-    plt.xlabel('euclidean distance')
-    plt.savefig('distance.png')
+    plt.legend(prop={'size': 15})
+    plt.xticks(fontsize=17)
+    plt.yticks(fontsize=17)
+
+    plt.ylabel('kernel value',fontsize=17)
+    plt.xlabel('euclidean distance',fontsize=17)
+    plt.tight_layout()
+    # plt.savefig('distance.png')
     plt.show()
 
 if __name__ == '__main__':

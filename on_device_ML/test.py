@@ -1,9 +1,16 @@
 import sklearn.metrics
 import numpy as np
 import time
+p =2048
+c = np.array([10,1,1,10,10])
+d = np.array([256,54,254,780,780])
+result = (p*(32*3+1+c))/(8*1024)
+print("&"+"kb & ".join(str(int(i)) for i in result)+"kb \\")
+
+exit()
 A = np.asmatrix(np.random.randn(2**19,2**6))
 np.sign(A,out = A)
-n = 2**16
+n = 2**19
 W = np.asmatrix(np.random.randn(2**6,1))
 np.sign(W,out = W)
 print(type(W))

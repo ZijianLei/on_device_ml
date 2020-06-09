@@ -6,14 +6,23 @@ import scipy
 # from extra_function import *
 from sklearn.kernel_approximation import RBFSampler
 # T_number = [1,2,4,8,16,32]
-data = ['ijcnn','usps']
+# data = ['covtype']
+# data = ['webspam']
+data = ['usps']
+# data = ['1','2']
 for d in data:
-        # cmd = "nohup python  coordinate_descent.py -d_libsvm %s -method 1 &"%(d)
-        # cmd2 = "nohup python  coordinate_descent.py -d_libsvm %s -method 2 &" % (d)
+        cmd = "nohup python  coordinate_descent.py -d_libsvm %s -method 1 &"%(d)
+        cmd2 = "nohup python  coordinate_descent.py -d_libsvm %s -method 2 &" % (d)
         cmd3 = "nohup python  LSBC.py -d_libsvm %s  &" % (d)
-        # os.system(cmd)
-        # os.system(cmd2)
+        cmd4 = "nohup python  RKS_Fastfood.py -d_libsvm %s  &" % (d)
+        # cmd = "nohup python  coordinate_descent.py -d_openml %s -method 1 &" % (d)
+        # cmd2 = "nohup python  coordinate_descent.py -d_openml %s -method 2 &" % (d)
+        # cmd3 = "nohup python  LSBC.py -d_openml %s  &" % (d)
+        # cmd4 = "nohup python  RKS_Fastfood.py -d_openml %s &" % (d)
+        os.system(cmd)
+        os.system(cmd2)
         os.system(cmd3)
+        os.system(cmd4)
 # d = 1024
 # T = 1
 # print(2^8)
