@@ -25,7 +25,7 @@ class Binarynet:
         self.coefficients = np.random.randn(self.dimension*FLAGS.p,self.class_number)
         #coeeficients shape is (d_project,class_number)torch.randn((self.dimension*FLAGS.p,self.class_number),requires_grad = True)
         self.loss = None # the objective function
-        self.lr = 4e-1
+        self.lr = 8e-1
         self.epoch = 1000
         self.gradient = None
         self.prediction = None
@@ -66,15 +66,18 @@ class Binarynet:
         print(accuracy,self.loss)
 
     def STE_layer(self):
-        return np.clip(self.gradient,-1,1)
-
+        # return np.clip(self.gradient,-1,1)
+        return np.multiply(self.gradient,np.where(abs(self.coefficients)<=1,1,0))
+    # def STE_layer2(self):
+    #     return np.multiply(self.gradient,np.where(abs(np.cos(self.x_transfer))<=1,1,0))
     def Backpropogation(self):
         p = FLAGS.p
         self.gradient = self.STE_layer()
         # self.coefficients = np.clip(self.coefficients,-1,1)
-        self.coefficients -= self.update_value()
-        self.gradient  = np.dot((self.prediction-self.label)/self.original.shape[0],self.wb.T).T
-        self.gradient = self.STE_layer().dot(-np.sin(self.x_transfer))
+        self.coefficients -= self.update_value()  #updata the W
+
+        self.gradient  = np.dot((self.prediction-self.label)/self.original.shape[0],self.wb.T).T # Get the gradient for updating the
+        self.gradient = self.gradient.dot(-np.sin(self.x_transfer))
         self.gradient = np.diag(self.gradient)
         self.gradient= np.multiply(self.S,self.gradient) #updating S
         self.S -= self.update_value()
@@ -83,7 +86,7 @@ class Binarynet:
             ffht.fht(self.gradient[i])
         self.gradient = self.gradient.reshape( -1)/(2**(self.dimension/2))
 
-        self.gradient = np.multiply(self.G, self.gradient)  # updating S
+        self.gradient = np.multiply(self.G, self.gradient)
         self.G -= self.update_value()
         self.gradient = self.gradient.reshape(1,-1)
         np.take(self.gradient, self.unpermutate, axis=1, out=self.gradient)
@@ -91,7 +94,7 @@ class Binarynet:
         for i in range(p):
             ffht.fht(self.gradient[i])
         self.gradient = self.gradient.reshape( -1)/(2**(self.dimension/2))
-        self.gradient = np.multiply(self.B, self.gradient)  # updating S
+        self.gradient = np.multiply(self.B, self.gradient)
         self.B = np.sign(self.B - self.update_value())
 
     def update_value(self):
@@ -101,8 +104,10 @@ class Binarynet:
         for i in range(self.epoch):
             self.Forwardpropogation()
             self.Backpropogation()
+            print(i,self.lr)
             if i%200 == 0:
-                self.lr /= 0.5
+                self.lr /= 2
+
 
     def predict(self):
         accuracy = sklearn.metrics.accuracy_score(np.argmax(self.prediction,axis = 1), np.argmax(self.label,axis = 1))
