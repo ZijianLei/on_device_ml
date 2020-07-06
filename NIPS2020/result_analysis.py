@@ -27,6 +27,7 @@ def main(name):
     acc_Fastfood = np.load('%s_Fastfood_8.npy' % name)
     acc_RKS = np.load('%s_RKS_8.npy' % name)
     #
+    print(acc_Fastfood,acc_RKS)
     print(" & ".join(str(np.around(i * 100, decimals=2)) for i in [np.max(acc_Fastfood)]),'fastfood' )
     print(" & ".join(str(np.around(i * 100, decimals=2)) for i in [np.max(acc_RKS)]), 'RKS')
     acc_scbd = np.load('%s_sign_8.npy' % name)
@@ -41,6 +42,7 @@ def main(name):
     print(acc_our, acc_our_linear,non_zero_2)
     acc_lsbc = np.load('%s_lsbc_8.npy' % name)
     acc_lsbc_sign = np.load('%s_lsbc_sign_8.npy' % name)
+    print(acc_lsbc_sign)
     print(" & ".join(str(np.around(i * 100, decimals=2)) for i in [np.max(acc_lsbc)]),'lsbc')
     print(" & ".join(str(np.around(i * 100, decimals=2)) for i in [np.max(acc_lsbc_sign)]), 'lsbc_sign')
 

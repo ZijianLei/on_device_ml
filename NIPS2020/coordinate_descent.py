@@ -11,12 +11,13 @@ import numpy as np
 from extra_function import *
 
 def main(name ):
-    iteration = 3
-    # T_number = [1, 2, 4, 8, 16,32]
+    iteration = 1
+    T_number = [1, 2, 4, 8, 16,32]
     T_number = [8]
-    # sigma_number = [2**10,2**9,2 ** 8,2**7, 2 ** 6, 2**5,2 ** 4,2**3.2**(-1)]
-    sigma_number = [20,24,28,32]
-    lambda_number = [1e1,1,0.1,0]
+    # sigma_number = [2**10,2**9,2 ** 8,2**7, 2 ** 6, 2**5,2 ** 4,2**3,2**(-1)]
+    sigma_number = [1]
+
+    lambda_number = [0]
     acc_binary_1 = []
     acc_binary_1_sign = []
     acc_binary_2_linear = []
@@ -30,11 +31,15 @@ def main(name ):
     for T in T_number:
         for iter in range(iteration):
             x_train, y_train, x_test, y_test = get_data(name, FLAGS)
+            clf = LinearSVC(dual = False)
+            clf.fit(x_train,y_train)
+            print(clf.score(x_test,y_test))
+            # exit()
             x,y = x_train,y_train
             n_number, f_num = np.shape(x)
             d = 2 ** math.ceil(np.log2(f_num))
 
-            FLAGS.T = T
+            FLAGS.p = T
             G = np.random.randn(T * d)
             B = np.random.uniform(-1, 1, T * d)
             B[B > 0] = 1
@@ -61,7 +66,7 @@ def main(name ):
             for si in sigma_number:
                 sigma = si
                 x, y = x_train, y_train
-                FLAGS.T = T
+                FLAGS.p = T
                 n_number, f_num = np.shape(x)
                 FLAGS.BATCHSIZE = n_number
                 y_temp = label_processing(y, n_number, FLAGS)
@@ -77,7 +82,7 @@ def main(name ):
                     # W_fcP = np.asmatrix(np.sign(np.random.randn(d * T, class_number)))
 
                 if method == 2:
-                    x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S, FLAGS, sigma))
+                    x_value = np.asmatrix(hadamard2(d, f_num, x, G, B, PI_value, S, FLAGS, sigma))
                     clf = LinearSVC(dual = False)
                     clf.fit(x_value, y)
 
@@ -86,7 +91,7 @@ def main(name ):
                     x_value0 is transformed based on sign(w^Tx)
                     '''
                     x, y = x_train, y_train
-                    FLAGS.T = T
+                    FLAGS.p = T
                     n_number, f_num = np.shape(x)
                     FLAGS.BATCHSIZE = n_number
                     y_temp = label_processing(y, n_number, FLAGS)
@@ -103,6 +108,8 @@ def main(name ):
                         # W_fcP = np.asmatrix(np.sign(W_fcP.reshape(-1, class_number)))
                         # W_fcP2 = np.asmatrix(np.sign(np.random.randn(d * T, class_number)))
                         W_fcP2 = np.asmatrix(np.sign(clf.coef_).T)
+                        # U, diag_sigma, VT = np.linalg.svd(np.dot(y_temp.T / T*d, x_value / T*d), full_matrices=False)
+                        # W_fcP2 = np.asmatrix(np.sign(np.dot(U, VT))).T
                         W_fcP2 = optimization(x_value, y_temp, W_fcP2, class_number, lamb)
                     # if method == 3:
                     #     x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S, FLAGS, sigma))
@@ -132,7 +139,7 @@ def main(name ):
                         # non_zeros1.append(np.count_nonzero(W_fcP))
 
                     if method == 2:
-                        test_x = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S, FLAGS, sigma))
+                        test_x = np.asmatrix(hadamard2(d, f_num, x, G, B, PI_value, S, FLAGS, sigma))
                         acc_binary_2.append(predict_acc(x_value,y_train,test_x,y_test,W_fcP2,class_number) )
                 #         print(acc_binary_2)
                         non_zeros2.append(np.count_nonzero(W_fcP2))
@@ -145,7 +152,7 @@ def main(name ):
                     acc_binary_1.append(clf.score(test_x0, y))
                 if method ==2:
                     acc_binary_2_linear.append(clf.score(test_x, y_test))
-    print(np.mean(np.array(acc_binary_2).reshape(3,-1),axis = 0),acc_binary_2_linear)
+    print(np.mean(np.array(acc_binary_2).reshape(1,-1),axis = 0),acc_binary_2_linear)
     exit()
     if method ==1:
         acc_binary_1 = np.array(acc_binary_1)
@@ -172,7 +179,7 @@ def main(name ):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     warnings.filterwarnings("ignore", category=DeprecationWarning)
-    parser.add_argument('-T', type=int,
+    parser.add_argument('-p', type=int,
                         default=None,
                         help='number of the different hadamard random projection')
     parser.add_argument('-BATCHSIZE', type=int,

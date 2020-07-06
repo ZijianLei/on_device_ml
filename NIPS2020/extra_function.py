@@ -11,6 +11,7 @@ from sklearn.model_selection import  train_test_split
 import scipy
 from sklearn.preprocessing import *
 import numpy as np
+
 from scipy.stats import chi
 import sklearn
 import copy
@@ -33,10 +34,12 @@ def get_data(name,FLAGS):
             x_train,x_test = x[:60000],x[60000:]
             y_train,y_test = y[:60000],y[60000:]
     else:
-        if name == 'webspam' or 'covtype':
+        if name == 'webspam' or name == 'covtype':
+            print(0)
             X,y = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" %(name,'train'))
             x_train, x_test, y_train, y_test = train_test_split(X, y, test_size = 0.2)
         elif name == 'usps':
+            print(1)
             x_train, y_train = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" % (name, 'usps'))
 
             x_test, y_test = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" % (name, 'usps.t'))
@@ -148,33 +151,29 @@ def hadamard(d,f_num,batch,G,B,PI_value,S,FLAGS,sigma = 1):
 
     return x_return[1:,:]
 
-def hadamard2(d,f_num,batch,G,B,PI_value,S,FLAGS):
-
-    start = time.time()
-    T = FLAGS.T
-
+def hadamard2(d,f_num,batch,G,B,PI_value,S,FLAGS,sigma = 1):
+    p = FLAGS.p
     x_ = batch
     n = x_.shape[0]
-      # x.shape [batch,d]
     x_ = np.pad(x_, ((0, 0), (0, d - x_.shape[1])), 'constant', constant_values=(0, 0))
-    x_ = np.tile(x_, (1, T))
-    x_i = np.multiply(x_, S)
-    x_ = x_i.reshape(FLAGS.BATCHSIZE * T, d)
-    for i in range(n*T):
-        ffht.fht(x_[i])
-    x_ = x_.reshape(FLAGS.BATCHSIZE, T * d)
-    x_transformed = np.multiply(x_, G)
-    np.take(x_, PI_value, axis=1, mode='wrap', out=x_)
+    x_ = np.tile(x_, (1, p))
 
-    x_ = np.reshape(x_transformed, (FLAGS.BATCHSIZE * T, d))
-    for i in range(n*T):
+    x_i = np.multiply(x_, B)
+    x_ = x_i.reshape(n * p, d)
+    for i in range(n * p):
         ffht.fht(x_[i])
-    x_ = x_.reshape(FLAGS.BATCHSIZE, T * d)
-    # print(np.linalg.norm(x_[:2],axis=1))
-    # print(np.mean(x_[:,:2], axis=0))
-    x_value = np.multiply(x_, B)
-    # x_temp = copy.deepcopy(x_value)*np.sqrt(2)
-    # print(time.time()-start)
+    x_ = x_.reshape(n, p * d)
+    np.take(x_, PI_value, axis=1, mode='wrap', out=x_)
+    x_transformed = np.multiply(x_, G)
+
+    x_ = np.reshape(x_transformed, (n * p, d))
+    for i in range(n * p):
+        ffht.fht(x_[i])
+    x_ = x_.reshape(n, p * d)
+    x_value = np.multiply(x_, S)
+
+    x_value = x_value / (sigma * (np.sqrt(p * d) ** 3))
+    x_value = np.cos(x_value + FLAGS.b) + FLAGS.t
     x_value = np.sign(x_value)
     return x_value
 
@@ -267,8 +266,69 @@ def optimization(x_value,y_temp,W,class_number,lamda = 0):
         # print(y_temp_c.shape,x_value.shape,W_temp.shape)
         temp_store = x_value.dot(W_temp)
         # print(temp_store.shape,y_temp_c.shape)
-        init= 1-np.multiply(y_temp_c,temp_store)
+        init= -np.multiply(y_temp_c,temp_store)
         hinge_loss = np.sum(np.clip(init,0,None))/n_number
+        regularization = np.count_nonzero(W_temp)*lamda
+        loss_new = np.sum(hinge_loss)+ regularization
+        loss_old =  2*loss_new
+        j = 0
+        while (loss_old-loss_new)/loss_old >= 1e-6:
+            loss_old = loss_new
+            for i in range(project_d):
+                if W_temp[i] != 0:
+                    w_i = W_temp[i]
+                    w_i2 = -W_temp[i]
+                    temp = np.multiply(y_temp_c,x_value[:,i]*w_i)
+                    derta = init + temp
+                    regularization -= lamda
+                    derta2 = init + 2 * temp
+                    regularization_2 = regularization + lamda
+                    loss = np.sum(np.clip(derta,0,None))/n_number + regularization
+                    if loss < loss_new:
+                        loss_new = loss
+                        init = derta
+                        W_temp[i] = 0
+                    loss = np.sum(np.clip(derta2,0,None))/n_number + regularization_2
+                    if loss < loss_new:
+                        loss_new = loss
+                        init = derta2
+                        W_temp[i] = w_i2
+                        regularization = regularization_2
+
+                else:
+                    temp = np.multiply(y_temp_c,x_value[:, i])
+                    derta = init - temp # change to 1
+                    regularization += lamda
+                    derta2 = init + temp # change to -1
+
+                    loss = np.sum(np.clip(derta, 0, None)) / n_number + regularization
+                    if loss < loss_new:
+                        loss_new = loss
+                        init = derta
+                        W_temp[i] = 1
+                    loss = np.sum(np.clip(derta2,0,None))/n_number  + regularization
+                    if loss < loss_new:
+                        loss_new = loss
+                        init = derta2
+                        W_temp[i] = -1
+            j +=1
+        W[:,c] = W_temp
+    return W
+def optimization_square_loss(x_value,y_temp,W,class_number,lamda = 0):
+    print('Training coordinate descent initiate using the square loss')
+    n_number, project_d = x_value.shape
+    #original optimization method
+    x_value = np.asmatrix(x_value)
+    lamda = lamda/project_d
+    for c in range(class_number):
+        # print(c)
+        W_temp = np.asmatrix(W[:,c])
+        y_temp_c = np.asmatrix(y_temp[:,c]).reshape(-1,1)
+        # print(y_temp_c.shape,x_value.shape,W_temp.shape)
+        temp_store = x_value.dot(W_temp)
+        # print(temp_store.shape,y_temp_c.shape)
+        # init= 1-np.multiply(y_temp_c,temp_store)
+        squre_loss = np.sum(np.clip(init,0,None))/n_number
         regularization = np.count_nonzero(W_temp)*lamda
         loss_new = np.sum(hinge_loss)+ regularization
         loss_old =  2*loss_new

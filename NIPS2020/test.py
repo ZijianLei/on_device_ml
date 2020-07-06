@@ -1,6 +1,10 @@
 import sklearn.metrics
+from sklearn.utils import  check_random_state
 import numpy as np
 import time
+random_state = check_random_state(None)
+print(random_state.normal(size = (1,6)))
+exit()
 p =2048
 c = np.array([10,1,1,10,10])
 d = np.array([256,54,254,780,780])

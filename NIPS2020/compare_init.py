@@ -102,34 +102,44 @@ def main(name ):
                 n_number, f_num = np.shape(x)
                 FLAGS.BATCHSIZE = n_number
                 y_temp = label_processing(y, n_number, FLAGS)
-                W_fcP = np.asmatrix(np.sign(np.zeros((d *T,class_number))))
 
                 x_value = np.asmatrix(hadamard(d, f_num, x, G, B, PI_value, S, FLAGS, sigma))
-                for c in range(class_number):
-                    index_x = np.where(y_temp[:, c] == 1)
-                    W_fcP[:, c] = np.asmatrix(np.sign(np.sum(x_value[index_x])))
+                print('compute svd')
+                start = time.time()
+                U,diag_sigma,VT = np.linalg.svd(np.dot(y_temp.T/2048,x_value/2048),full_matrices=False)
+                W_fcP = np.asmatrix(np.sign(np.dot(U,VT))).T
+                # print(np.count_nonzero(W_fcP-1))
+                # print(time.time()-start)
+                # exit()
+                # for c in range(class_number):
+                #     index_x = np.where(y_temp[:, c] == 1)
+                #     W_fcP[:, c] = np.asmatrix(np.sign(np.sum(x_value[index_x])))
                 W_fcP2 = np.asmatrix(np.sign(np.random.randn(d * T, class_number)))
+
+                start = time.time()
                 clf = LinearSVC()
                 clf.fit(x_value, y)
+                print(time.time() - start,'linear pretrain')
                 # print(clf.coef_.shape)
                 # exit()
                 W_fcP3 = np.asmatrix(np.sign(clf.coef_)).T
                 W_fcP4 = np.asmatrix(clf.coef_).T
-                W_fcP,loss1 = compare_init_optimization(x_value, y_temp, W_fcP, class_number, lamb)
+
                 W_fcP2,loss2 = compare_init_optimization(x_value, y_temp, W_fcP2, class_number, lamb)
                 W_fcP3,loss3 = compare_init_optimization(x_value, y_temp, W_fcP3, class_number, lamb)
                 # W_fcP4,loss4 = compare_init_optimization(x_value, y_temp, W_fcP4, class_number, lamb)
-                # plt.plot(np.arange(len(loss1)),loss1,linewidth = 2,linestyle= '--',label = 'zero init')
+                W_fcP, loss1 = compare_init_optimization(x_value, y_temp, W_fcP, class_number, lamb)
+                plt.plot(np.arange(len(loss1[1:])),loss1[1:],linewidth = 3,linestyle= '--',label = 'our proposed',marker = 's',markersize = 12)
                 plt.plot(np.arange(len(loss2)), loss2, linewidth=3, linestyle='--', label='random init',marker = 's',markersize = 12)
                 plt.plot(np.arange(len(loss3)), loss3, linewidth=3, linestyle='--', label='init from svm',marker = 'v',markersize = 12)
                 # plt.plot(np.arange(len(loss4)), loss4, linewidth=2, linestyle='--', label='sign init from svm')
                 plt.legend(prop={'size': 15})
-                plt.xticks(np.arange(len(loss2)),fontsize=17)
+                # plt.xticks(np.arange(len(loss1)),fontsize=17)
                 plt.yticks(fontsize=17)
                 plt.ylabel('objective value',fontsize=17)
                 plt.xlabel('iteration',fontsize=17)
                 plt.tight_layout()
-                plt.savefig('compare_init.png')
+                # plt.savefig('compare_init.png')
                 plt.show()
 
 
