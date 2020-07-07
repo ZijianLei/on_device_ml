@@ -43,8 +43,8 @@ class Binarynet:
         x_ = np.pad(x_, ((0, 0), (0, self.dimension - x_.shape[1])), 'constant', constant_values=(0, 0))
         x_ = np.tile(x_, (1, p))
         self.original = x_
-        x_i = np.multiply(x_, self.B)
-        x_ = x_i.reshape(n * p, self.dimension)
+        self.x_B = np.multiply(x_, self.B)
+        x_ = self.x_B.reshape(n * p, self.dimension)
         for i in range(n * p):
             ffht.fht(x_[i])
         x_ = x_.reshape(n, p * self.dimension)
@@ -53,6 +53,7 @@ class Binarynet:
         x_ = np.reshape(x_transformed, (n * p, self.dimension))
         for i in range(n * p):
             ffht.fht(x_[i])
+
         self.x_S = x_.reshape(n, p * self.dimension)
         x_= np.multiply(self.x_S, self.S)
         x_= x_/(np.sqrt(p * self.dimension) ** 3)
@@ -74,12 +75,13 @@ class Binarynet:
     def Backpropogation(self):
         p = FLAGS.p
         self.gradient = self.STE_layer()
-        self.coefficients = np.clip(self.coefficients,-1,1)
+        # self.coefficients = np.clip(self.coefficients,-1,1)
         self.coefficients -= self.update_value()  #updata the W
 
         self.gradient  = np.dot((self.prediction-self.label)/self.original.shape[0],self.wb.T)
         # self.gradient = self.gradient.multiply(-np.sin(self.x_transfer+FLAGS.b)) # Get the gradient from the objective function with respect to z
         self.gradient = np.multiply(self.gradient,-np.sin(self.x_transfer + FLAGS.b))
+        print(self.gradient.shape)
         S = copy.deepcopy(self.S)
         self.S -= self.update_S()
         self.gradient= np.multiply(S,self.gradient)  # gradient update after S
