@@ -4,6 +4,7 @@ from __future__ import print_function
 import argparse
 import time
 import numpy as np
+import copy
 from extra_function import *
 from imblearn.over_sampling import SMOTE
 import ffht
@@ -25,12 +26,15 @@ class Binarynet:
         self.coefficients = np.random.randn(self.dimension*FLAGS.p,self.class_number)
         #coeeficients shape is (d_project,class_number)torch.randn((self.dimension*FLAGS.p,self.class_number),requires_grad = True)
         self.loss = None # the objective function
-        self.lr = 8e-1
-        self.epoch = 1000
+        self.lr = 1
+        self.epoch = 250
         self.gradient = None
         self.prediction = None
         self.wb = None
         self.x_transfer = None
+        self.x_S = None
+        self.x_G = None
+        self.x_B = None
 
     def Forwardpropogation(self):
         p = FLAGS.p
@@ -44,13 +48,13 @@ class Binarynet:
         for i in range(n * p):
             ffht.fht(x_[i])
         x_ = x_.reshape(n, p * self.dimension)
-        np.take(x_, self.PI_value, axis=1, mode='wrap', out=x_)
-        x_transformed = np.multiply(x_, self.G)
+        self.x_G = np.take(x_, self.PI_value, axis=1, mode='wrap')
+        x_transformed = np.multiply(self.x_G, self.G)
         x_ = np.reshape(x_transformed, (n * p, self.dimension))
         for i in range(n * p):
             ffht.fht(x_[i])
-        x_ = x_.reshape(n, p * self.dimension)
-        x_= np.multiply(x_, self.S)
+        self.x_S = x_.reshape(n, p * self.dimension)
+        x_= np.multiply(self.x_S, self.S)
         x_= x_/(np.sqrt(p * self.dimension) ** 3)
         self.x_transfer= np.cos(x_+ FLAGS.b) + FLAGS.t
         x_= np.sign(self.x_transfer)
@@ -61,51 +65,61 @@ class Binarynet:
         self.loss = sklearn.metrics.log_loss(self.label,prediction)
         self.gradient = np.dot(x_.T,prediction-self.label)/x_.shape[0]
         # print(self.coefficients)
-        print(np.argmax(self.prediction, axis=1)[:10], np.argmax(self.label, axis=1)[:10])
         accuracy = sklearn.metrics.accuracy_score(np.argmax(self.prediction, axis=1), np.argmax(self.label, axis=1))
         print(accuracy,self.loss)
 
     def STE_layer(self):
-        # return np.clip(self.gradient,-1,1)
         return np.multiply(self.gradient,np.where(abs(self.coefficients)<=1,1,0))
-    # def STE_layer2(self):
-    #     return np.multiply(self.gradient,np.where(abs(np.cos(self.x_transfer))<=1,1,0))
+
     def Backpropogation(self):
         p = FLAGS.p
         self.gradient = self.STE_layer()
-        # self.coefficients = np.clip(self.coefficients,-1,1)
+        self.coefficients = np.clip(self.coefficients,-1,1)
         self.coefficients -= self.update_value()  #updata the W
 
-        self.gradient  = np.dot((self.prediction-self.label)/self.original.shape[0],self.wb.T).T # Get the gradient for updating the
-        self.gradient = self.gradient.dot(-np.sin(self.x_transfer))
-        self.gradient = np.diag(self.gradient)
-        self.gradient= np.multiply(self.S,self.gradient) #updating S
-        self.S -= self.update_value()
-        self.gradient = self.gradient.reshape(p,-1)
-        for i in range(p):
-            ffht.fht(self.gradient[i])
-        self.gradient = self.gradient.reshape( -1)/(2**(self.dimension/2))
+        self.gradient  = np.dot((self.prediction-self.label)/self.original.shape[0],self.wb.T)
+        # self.gradient = self.gradient.multiply(-np.sin(self.x_transfer+FLAGS.b)) # Get the gradient from the objective function with respect to z
+        self.gradient = np.multiply(self.gradient,-np.sin(self.x_transfer + FLAGS.b))
+        S = copy.deepcopy(self.S)
+        self.S -= self.update_S()
+        self.gradient= np.multiply(S,self.gradient)  # gradient update after S
 
-        self.gradient = np.multiply(self.G, self.gradient)
-        self.G -= self.update_value()
-        self.gradient = self.gradient.reshape(1,-1)
-        np.take(self.gradient, self.unpermutate, axis=1, out=self.gradient)
-        self.gradient = self.gradient.reshape(p, -1)
-        for i in range(p):
+
+        for i in range(self.gradient.shape[0]):
             ffht.fht(self.gradient[i])
-        self.gradient = self.gradient.reshape( -1)/(2**(self.dimension/2))
-        self.gradient = np.multiply(self.B, self.gradient)
-        self.B = np.sign(self.B - self.update_value())
+        self.gradient = self.gradient/(2**(self.dimension/2))# gradient update after H
+
+        G = copy.deepcopy(self.G)
+        self.G -= self.update_G()
+        self.gradient = np.multiply(G, self.gradient)# gradient update after g
+        np.take(self.gradient, self.unpermutate, axis=1, out=self.gradient) #gradient update after Pi
+
+        for i in range(self.gradient.shape[0]):
+            ffht.fht(self.gradient[i])
+        self.gradient = self.gradient/(2**(self.dimension/2)) # gradient update after H
+
+        # self.B = np.sign(self.B - self.update_B())
+        self.gradient = np.multiply(self.B, self.gradient) # gradient updata after B if we have further layer in the deep neural network
+    def update_S(self):
+        return  self.lr *np.diag(np.dot(self.x_S.T, self.gradient))
+        # return self.lr * np.diag(np.dot(self.x_S,self.gradient))
+    def update_G(self):
+        return self.lr * np.diag(np.dot(self.x_G.T, self.gradient))
+        # return self.lr * np.diag(np.dot(self.x_G,self.gradient ))
+    def update_B(self):
+        return  self.lr *np.diag(np.dot(self.original.T, self.gradient))
+        # return self.lr*np.diag(np.dot(self.original,self.gradient))
 
     def update_value(self):
         return self.lr*self.gradient
 
     def train(self):
         for i in range(self.epoch):
+            print(i, self.lr)
             self.Forwardpropogation()
             self.Backpropogation()
-            print(i,self.lr)
-            if i%200 == 0:
+
+            if i%50== 0:
                 self.lr /= 2
 
 
