@@ -48,7 +48,8 @@ def main(name ):
             PI_value = np.hstack([(i * d) + np.random.permutation(d) for i in range(T)])
             G_fro = G.reshape(T, d)
             s_i = chi.rvs(d, size=(T, d))
-            S = np.multiply(s_i, np.array(np.linalg.norm(G_fro, axis=1)).reshape(T, -1))
+
+            S = np.multiply(s_i, np.array(np.linalg.norm(G_fro, axis=1)**(-0.5)).reshape(T, -1))
             S = S.reshape(1, -1)
             FLAGS.BATCHSIZE = n_number
             class_number = len(np.unique(y))
