@@ -30,8 +30,8 @@ class Binarynet:
         self.coefficients = np.random.randn(self.dimension*FLAGS.p,self.class_number)
         #coeeficients shape is (d_project,class_number)torch.randn((self.dimension*FLAGS.p,self.class_number),requires_grad = True)
         self.loss = None # the objective function
-        self.lr = 1e-1
-        self.epoch = 5
+        self.lr = 0.1
+        self.epoch = 100
         self.gradient = None
         self.prediction = None
         self.wb = None
@@ -39,6 +39,10 @@ class Binarynet:
         self.x_S = None
         self.x_G = None
         self.x_B = None
+        self.momentum = 0.9
+        self.momentum_W = 0
+        self.momentum_S = 0
+        self.momentum_G = 0
         self.plt = []
 
     def Forwardpropogation(self):
@@ -77,6 +81,7 @@ class Binarynet:
         prediction = 1/(1+np.exp(-x_.dot(np.sign(self.coefficients))) )
         self.prediction = prediction
         self.loss = sklearn.metrics.log_loss(self.label, prediction)
+
         self.gradient = np.dot(x_.T, prediction - self.label) / x_.shape[0]
         '''
         using the softmax function
@@ -97,6 +102,7 @@ class Binarynet:
     def Backpropogation(self):
         p = FLAGS.p
         self.gradient = self.STE_layer()
+
         # self.coefficients = np.clip(self.coefficients,-1,1)
         self.coefficients -= self.update_value()  #updata the W
     def Fastfood_updata(self):
@@ -116,35 +122,37 @@ class Binarynet:
         # exit()
         self.gradient= np.multiply(S,self.gradient)  # gradient update after S
         #
-        # self.gradient = self.gradient.reshape(-1,self.dimension)
-        # for i in range(self.gradient.shape[0]):
-        #     ffht.fht(self.gradient[i])
-        # self.gradient = self.gradient/(2**(self.dimension/2))# gradient update after H
-        # self.gradient = self.gradient.reshape(-1, p*self.dimension)
-        # G = copy.deepcopy(self.G)
-        # self.G -= self.update_G()
+        self.gradient = self.gradient.reshape(-1,self.dimension)
+        for i in range(self.gradient.shape[0]):
+            ffht.fht(self.gradient[i])
+        self.gradient = self.gradient/(2**(self.dimension/2))# gradient update after H
+        self.gradient = self.gradient.reshape(-1, p*self.dimension)
+        G = copy.deepcopy(self.G)
+        self.G -= self.update_G()
         # self.gradient = np.multiply(G, self.gradient)# gradient update after g
         # np.take(self.gradient, self.unpermutate, axis=1, out=self.gradient) #gradient update after Pi
         # self.gradient = self.gradient.reshape(-1,self.dimension)
         # for i in range(self.gradient.shape[0]):
         #     ffht.fht(self.gradient[i])
         # self.gradient = self.gradient/(2**(self.dimension/2)) # gradient update after H
-        #self.gradient = self.gradient.reshape(-1, p*self.dimension)
+        # self.gradient = self.gradient.reshape(-1, p*self.dimension)
         # # self.B = np.sign(self.B - self.update_B())
         # self.gradient = np.multiply(self.B, self.gradient) # gradient updata after B if we have further layer in the deep neural network
     def update_S(self):
-        return  self.lr *np.diag(np.dot(self.x_S.T, self.gradient))
+        self.momentum_S = self.momentum*self.momentum_S+self.lr *np.diag(np.dot(self.x_S.T, self.gradient))
+        return  self.momentum_S
         # return self.lr * np.diag(np.dot(self.x_S,self.gradient))
     def update_G(self):
-        return self.lr * np.diag(np.dot(self.x_G.T, self.gradient))
-        # return self.lr * np.diag(np.dot(self.x_G,self.gradient ))
+        self.momentum_G = self.momentum * self.momentum_G + self.lr * np.diag(np.dot(self.x_G.T, self.gradient))
+        return self.momentum_G
+        # return self.lr * np.diag(np.dot(self.x_G.T, self.gradient))
     def update_B(self):
         return  self.lr *np.diag(np.dot(self.original.T, self.gradient))
         # return self.lr*np.diag(np.dot(self.original,self.gradient))
 
     def update_value(self):
-        return self.lr*self.gradient
-
+        self.momentum_W = self.momentum *self.momentum_W+self.lr*self.gradient
+        return self.momentum_W
     def train(self):
         for i in range(self.epoch):
             temp = np.hstack((self.full_label,self.full_data))
@@ -152,7 +160,7 @@ class Binarynet:
             # self.label = temp[:, :self.class_number]
             # self.batch = temp[:, self.class_number:]
             rng.shuffle(temp)
-            for example in np.array_split(temp,np.int(temp.shape[0])):
+            for example in np.array_split(temp,np.int(temp.shape[0]/1024)):
                 self.label = example[:,:self.class_number]
                 self.batch = example[:,self.class_number:]
 
@@ -160,7 +168,8 @@ class Binarynet:
                 self.Backpropogation()
                 # if i!=0 and i/18 == 0:
                 self.Fastfood_updata()
-            self.lr = 1/(i+1)
+            # self.lr = 1/(i+1)
+
 
             # self.label = self.full_label
             # self.batch = self.full_data
@@ -199,8 +208,8 @@ def main(name ):
     class_number = len(np.unique(y))
     loss = []
     y_temp = label_processing(y, n_number, FLAGS)
-    if class_number == 2:
-        class_number -= 1
+    # if class_number == 2:
+    #     class_number -= 1
     PI_value, G, B, S = parameters(n_number,p,d,FLAGS)
     BNet = Binarynet(PI_value, G, B, S,d ,class_number)
 

@@ -132,8 +132,17 @@ def label_processing(y,n_number,FLAGS):
         for date from libsvm dataset both binary classification and multi-classification problem
         '''
         if class_number == 2:
-            y_temp = np.array(np.where(y[:] != 1, 0, 1).reshape(n_number, 1))
-            class_number -= 1
+            # y_temp = np.array(np.where(y[:] != 1, 0, 1).reshape(n_number, 1))
+            y_0 = np.zeros((n_number, 1))
+            if FLAGS.d_libsvm == 'covtype':
+                y = y - 1
+            if FLAGS.d_libsvm == 'webspam':
+                y[y == -1] = 0
+            for i in range(class_number):
+                y_temp = np.where(y[:] != i, 0, 1).reshape(n_number, 1)
+                y_0 = np.hstack((y_0, y_temp))
+            y_temp = y_0[:, 1:]
+            # class_number -= 1
         else:
             y_0 = np.zeros((n_number, 1))
             y = y - 1
