@@ -50,6 +50,7 @@ class Binarynet:
         self.plt_test_acc = []
         self.plt_train_loss = []
         self.plt_test_loss = []
+        self.ywx = None
 
     def Forwardpropogation(self):
         p = FLAGS.p
@@ -61,6 +62,7 @@ class Binarynet:
         self.original = x_
         self.x_B = np.multiply(x_, self.B)
         x_ = self.x_B.reshape(n * p, self.dimension)
+
         for i in range(n * p):
 
             ffht.fht(x_[i])
@@ -78,21 +80,23 @@ class Binarynet:
         # print(np.max(self.x_transfer),np.mean(self.x_transfer),np.min(self.x_transfer))
         # exit()
         x_transfer= np.cos(x_+ FLAGS.b) + FLAGS.t
-        '''
-        control whether the feature and coefficients are binary
-        '''
         x_= np.sign(x_transfer)
-        # x_ = x_transfer
         self.wb = np.sign(self.coefficients)
-        # self.wb = copy.deepcopy(self.coefficients)
         '''
         using the sigmoid function we will use the sigmoid activation for the multiclass problem
         '''
-        prediction = 1/(1+np.exp(-x_.dot(self.wb)) )
-        self.prediction = prediction
-        self.loss = sklearn.metrics.log_loss(self.label, prediction)
+        prediction = x_.dot(np.sign(self.coefficients))
+        self.ywx = np.multiply(self.label, prediction)
+        self.prediction = np.where(prediction>0,1,-1)
 
-        self.gradient = np.dot(x_.T, prediction - self.label) / x_.shape[0]
+        self.loss = np.sum(np.clip(1-self.ywx, 0, None)) / x_.shape[0]
+        # self.loss = sklearn.metrics.log_loss(self.label, prediction)
+        self.ywx = np.where(self.ywx<1,1,0)
+
+        self.gradient = - np.multiply(np.mean(self.ywx,axis=0),np.dot(x_.T,  self.label))
+        # print(np.count_nonzero(self.gradient))
+        # print(self.gradient[0,:10])
+        # print(self.coefficients[0,:10])
         '''
         using the softmax function
         '''
@@ -115,7 +119,9 @@ class Binarynet:
         self.coefficients -= self.update_value()  #updata the W
     def Fastfood_updata(self):
         p = FLAGS.p
-        self.gradient  = np.dot((self.prediction-self.label)/self.original.shape[0],self.wb.T)
+        # print(self.label.shape)
+        self.gradient  =- np.multiply(np.mean(self.ywx,axis=1).reshape(-1,1),np.dot((self.label)/self.original.shape[0],self.wb.T))
+        # print(self.gradient.shape)
         self.gradient = np.multiply(self.gradient,-np.sin(self.x_transfer + FLAGS.b))
         self.gradient = np.array(self.gradient)
 
@@ -141,11 +147,11 @@ class Binarynet:
         # # self.B = np.sign(self.B - self.update_B())
         # self.gradient = np.multiply(self.B, self.gradient) # gradient updata after B if we have further layer in the deep neural network
     def update_S(self):
-        self.momentum_S = self.momentum*self.momentum_S+self.lr *np.diag(np.dot(self.x_S.T, self.gradient))*1e-4
+        self.momentum_S = self.momentum*self.momentum_S+self.lr *np.diag(np.dot(self.x_S.T, self.gradient))*1e-5
         return  self.momentum_S
         # return self.lr * np.diag(np.dot(self.x_S,self.gradient))
     def update_G(self):
-        self.momentum_G = self.momentum * self.momentum_G + self.lr * np.diag(np.dot(self.x_G.T, self.gradient))*1e-4
+        self.momentum_G = self.momentum * self.momentum_G + self.lr * np.diag(np.dot(self.x_G.T, self.gradient))*1e-5
         return self.momentum_G
         # return self.lr * np.diag(np.dot(self.x_G.T, self.gradient))
     def update_B(self):
@@ -178,9 +184,7 @@ class Binarynet:
             acc = self.predict()
             self.plt_test_acc.append(acc)
             self.plt_test_loss.append(self.loss)
-
-
-        print(acc)
+            # print(acc)
             # if i!=0 and i%3== 0:
             #     self.lr /= 2
     def predict(self):
@@ -189,33 +193,10 @@ class Binarynet:
         self.Forwardpropogation()
 
         # print(self.label)
-        # print(np.argmax(self.prediction, axis=1)[:100], np.argmax(self.label, axis=1)[:100])
+        # print(np.argmax(self.prediction, axis=1)[:10], np.argmax(self.label, axis=1)[:10])
+        # print(self.prediction[:2])
         accuracy = sklearn.metrics.accuracy_score(np.argmax(self.prediction,axis = 1), np.argmax(self.label,axis = 1))
         return accuracy
-    def train_coefficient(self):
-
-        self.coefficients = self.coefficients_temp
-        # print(self.coefficients)
-        self.momentum_W = 0
-        for i in range(self.epoch):
-            self.batch = self.full_data
-            self.label = self.full_label
-            acc = self.predict()
-            self.plt_train_acc.append(acc)
-            self.plt_train_loss.append(self.loss)
-            temp = np.hstack((self.full_label,self.full_data))
-            rng = np.random.default_rng()
-            rng.shuffle(temp)
-            for example in np.array_split(temp,np.int(temp.shape[0]/FLAGS.batch_size)):
-                self.label = example[:,:self.class_number]
-                self.batch = example[:,self.class_number:]
-                self.Forwardpropogation()
-                self.Backpropogation()
-            self.label = self.full_label_test
-            self.batch = self.full_data_test
-            acc = self.predict()
-            self.plt_test_acc.append(acc)
-            self.plt_test_loss.append(self.loss)
 
 
 def main(name ):
@@ -232,48 +213,48 @@ def main(name ):
     FLAGS.data_number = n_number
     class_number = len(np.unique(y))
     loss = []
-    y_temp = label_processing(y, n_number, FLAGS)
+    y_temp = label_processing_hinge(y, n_number, FLAGS)
+    # if class_number == 2:
+    #     class_number -= 1
     PI_value, G_0, B, S_0 = parameters(n_number,p,d,FLAGS)
     BNet = Binarynet(PI_value, G_0, B, S_0,d ,class_number)
+
     BNet.full_data = x
     BNet.full_label = y_temp
+
     BNet.class_number = class_number
     n_number, f_num = np.shape(x_test)
     FLAGS.data_number = n_number
-    y_temp_test = label_processing(y_test, n_number, FLAGS)
+    y_temp_test = label_processing_hinge(y_test, n_number, FLAGS)
     BNet.full_data_test = x_test
     BNet.full_label_test = y_temp_test
     BNet.train()
     print('the predict result (adaptive fastfood)', BNet.predict())
-    exit()
-    '''
-    the following part is used to plot the loss and accuracy
-    '''
-    plt.plot(np.arange(len(BNet.plt_train_acc[1:])),BNet.plt_train_acc[1:],label = 'train_fastfood')
-    plt.plot(np.arange(len(BNet.plt_test_acc)), BNet.plt_test_acc,label ='test_fastfood')
-    # the result only compute the STE of coefficient
-    train_loss = copy.deepcopy(BNet.plt_train_loss)
-    test_loss = copy.deepcopy(BNet.plt_test_loss)
-    BNet.G = G_0
-    BNet.B = B
-    BNet.S = S_0/(FLAGS.s*np.sqrt(FLAGS.p * d) ** 3)
+    # plt.plot(np.arange(len(BNet.plt_train_acc[1:])),BNet.plt_train_acc[1:],label = 'train_fastfood')
+    # plt.plot(np.arange(len(BNet.plt_test_acc)), BNet.plt_test_acc,label ='test_fastfood')
+    # # the result only compute the STE of coefficient
+    # train_loss = copy.deepcopy(BNet.plt_train_loss)
+    # test_loss = copy.deepcopy(BNet.plt_test_loss)
+    # BNet.G = G_0
+    # BNet.B = B
+    # BNet.S = S_0/(FLAGS.s*np.sqrt(FLAGS.p * d) ** 3)
     # BNet.lr = 1e-2
-    BNet.plt_test_acc = []
-    BNet.plt_train_acc = []
-    BNet.plt_test_loss = []
-    BNet.plt_train_loss = []
-    BNet.train_coefficient()
-    plt.plot(np.arange(len(BNet.plt_train_acc[1:])), BNet.plt_train_acc[1:], label='train_w')
-    plt.plot(np.arange(len(BNet.plt_test_acc)), BNet.plt_test_acc, label='test_w')
-    plt.legend(prop={'size': 15})
+    # BNet.plt_test_acc = []
+    # BNet.plt_train_acc = []
+    # BNet.plt_test_loss = []
+    # BNet.plt_train_loss = []
+    # BNet.train_coefficient()
+    # plt.plot(np.arange(len(BNet.plt_train_acc[1:])), BNet.plt_train_acc[1:], label='train_w')
+    # plt.plot(np.arange(len(BNet.plt_test_acc)), BNet.plt_test_acc, label='test_w')
+    # plt.legend(prop={'size': 15})
     # plt.savefig('%s_%f_acc.jpg' % (name,FLAGS.s))
     # plt.show()
-    plt.cla()
-    plt.plot(np.arange(len(train_loss[1:])), train_loss[1:], label='train_fastfood')
-    plt.plot(np.arange(len(test_loss)), test_loss, label='test_fastfood')
-    plt.plot(np.arange(len(BNet.plt_train_loss[1:])), BNet.plt_train_loss[1:], label='train_w')
-    plt.plot(np.arange(len(BNet.plt_test_loss)), BNet.plt_test_loss, label='test_w')
-    plt.legend(prop={'size': 15})
+    # plt.cla()
+    # plt.plot(np.arange(len(train_loss[1:])), train_loss[1:], label='train_fastfood')
+    # plt.plot(np.arange(len(test_loss)), test_loss, label='test_fastfood')
+    # plt.plot(np.arange(len(BNet.plt_train_loss[1:])), BNet.plt_train_loss[1:], label='train_w')
+    # plt.plot(np.arange(len(BNet.plt_test_loss)), BNet.plt_test_loss, label='test_w')
+    # plt.legend(prop={'size': 15})
     # plt.show()
     # plt.savefig('%s_%f_loss.jpg' % (name, FLAGS.s))
     # exit()

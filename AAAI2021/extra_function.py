@@ -60,59 +60,6 @@ def parameters(n_number,p,d,FLAGS):
     FLAGS.t = np.random.uniform(-1 , 1 , d * p)
     return PI_value,G,B,S
 
-def fastfood(d,f_num,batch,G,B,PI_value,S,FLAGS,sigma = 1):
-    p = FLAGS.p
-    x_ = batch
-    n = x_.shape[0]
-    x_ = np.pad(x_, ((0, 0), (0, d - x_.shape[1])), 'constant', constant_values=(0, 0))
-    x_ = np.tile(x_, (1, p))
-    x_i = np.multiply(x_, S)
-    x_ = x_i.reshape(FLAGS.data_number * p, d)
-    for i in range(n*p):
-        ffht.fht(x_[i])
-    x_ = x_.reshape(FLAGS.data_number, p * d)
-    x_transformed = np.multiply(x_, G)
-    np.take(x_, PI_value, axis=1, mode='wrap', out=x_)
-    x_ = np.reshape(x_transformed, (FLAGS.data_number * p, d))
-    for i in range(n*p):
-        ffht.fht(x_[i])
-    x_ = x_.reshape(FLAGS.data_number, p * d)
-    x_value = np.multiply(x_, B)/(p*d)
-    x_value = np.sqrt(2*sigma) * x_value / np.sqrt(d*p)
-    x_value = np.cos(x_value)
-    return x_value
-
-def feature_binarizing(d,f_num,batch,G,B,PI_value,S,FLAGS,sigma = 1):
-    '''
-    :param d:  origin dimension of data d = 2**q
-    :param batch:  the original data x
-    :param G, B, PI_value, S: Paramters of FastFood Kernel approximation
-    :param sigma: rescaling the transformed data
-    :return:  return the binary kernel approximation of data sign(cos(RX+b)+t)
-    '''
-    p = FLAGS.p
-    x_ = batch
-    n = x_.shape[0]
-    x_ = np.pad(x_, ((0, 0), (0, d - x_.shape[1])), 'constant', constant_values=(0, 0))
-    x_ = np.tile(x_, (1, p))
-    x_i = np.multiply(x_, S)
-    x_ = x_i.reshape(n * p, d)
-    for i in range(n*p):
-        ffht.fht(x_[i])
-    x_ = x_.reshape(n, p * d)
-    x_transformed = np.multiply(x_, G)
-    np.take(x_, PI_value, axis=1, mode='wrap', out=x_)
-    x_ = np.reshape(x_transformed, (n * p, d))
-    for i in range(n*p):
-        ffht.fht(x_[i])
-    x_ = x_.reshape(n, p * d)
-    x_value = np.multiply(x_, B)
-    x_value = x_value/(sigma*(np.sqrt(p*d)**3))
-    x_value = np.cos(x_value+FLAGS.b)+FLAGS.t
-    x_value = np.sign(x_value)
-    return x_value
-
-
 def label_processing(y,n_number,FLAGS):
     '''
             Start to processing the label
@@ -151,109 +98,42 @@ def label_processing(y,n_number,FLAGS):
                 y_0 = np.hstack((y_0, y_temp))
             y_temp = y_0[:, 1:]
     return y_temp
+def label_processing_hinge(y,n_number,FLAGS):
+    '''
+            Start to processing the label
+    '''
+    class_number = len(np.unique(y))
+    if FLAGS.d_openml != None:
+        '''
+        lable convert from str to int in openml dataset
+        '''
+        y_0 = np.zeros((n_number, 1))
+        for i in range(class_number):
+            y_temp = np.where(y[:] != '%d' % i, -1, 1)
+            y_0 = np.hstack((y_0, np.mat(y_temp).T))
+        y_temp = y_0[:, 1:]
+    else:
+        '''
+        for date from libsvm dataset both binary classification and multi-classification problem
+        '''
+        if class_number == 2:
+            # y_temp = np.array(np.where(y[:] != 1, 0, 1).reshape(n_number, 1))
+            y_0 = np.zeros((n_number, 1))
+            if FLAGS.d_libsvm == 'covtype':
+                y = y - 1
+            if FLAGS.d_libsvm == 'webspam':
+                y[y == -1] = -1
+            for i in range(class_number):
+                y_temp = np.where(y[:] != i, -1, 1).reshape(n_number, 1)
+                y_0 = np.hstack((y_0, y_temp))
+            y_temp = y_0[:, 1:]
+            # class_number -= 1
+        else:
+            y_0 = np.zeros((n_number, 1))
+            y = y - 1
+            for i in range(class_number):
+                y_temp = np.where(y[:] != i, -1, 1).reshape(n_number, 1)
+                y_0 = np.hstack((y_0, y_temp))
+            y_temp = y_0[:, 1:]
+    return y_temp
 
-
-def optimization(x_value,y_temp,W,class_number,lamda = 0):
-    n_number, project_d = x_value.shape
-    x_value = np.asmatrix(x_value)
-    lamda = lamda/project_d
-    for c in range(class_number):
-        W_temp = np.asmatrix(W[:,c])
-        y_temp_c = np.asmatrix(y_temp[:,c]).reshape(-1,1)
-        temp_store = x_value.dot(W_temp)
-        init= 1-np.multiply(y_temp_c,temp_store)
-        hinge_loss = np.sum(np.clip(init,0,None))/n_number
-        regularization = np.count_nonzero(W_temp)*lamda
-        loss_new = np.sum(hinge_loss)+ regularization
-        loss_old = 2*loss_new
-        while (loss_old-loss_new)/loss_old >= 1e-6:
-            loss_old = loss_new
-            for i in range(project_d):
-                if W_temp[i] != 0:
-                    w_i = W_temp[i]
-                    w_i2 = -W_temp[i]
-                    temp = np.multiply(y_temp_c,x_value[:,i]*w_i)
-                    derta = init + temp
-                    regularization -= lamda
-                    derta2 = init + 2 * temp
-                    regularization_2 = regularization + lamda
-                    loss = np.sum(np.clip(derta,0,None))/n_number + regularization
-                    if loss < loss_new:
-                        loss_new = loss
-                        init = derta
-                        W_temp[i] = 0
-                    loss = np.sum(np.clip(derta2,0,None))/n_number + regularization_2
-                    if loss < loss_new:
-                        loss_new = loss
-                        init = derta2
-                        W_temp[i] = w_i2
-                        regularization = regularization_2
-
-                else:
-                    temp = np.multiply(y_temp_c,x_value[:, i])
-                    derta = init - temp  # change to 1
-                    regularization += lamda
-                    derta2 = init + temp  # change to -1
-
-                    loss = np.sum(np.clip(derta, 0, None)) / n_number + regularization
-                    if loss < loss_new:
-                        loss_new = loss
-                        init = derta
-                        W_temp[i] = 1
-                    loss = np.sum(np.clip(derta2,0,None))/n_number  + regularization
-                    if loss < loss_new:
-                        loss_new = loss
-                        init = derta2
-                        W_temp[i] = -1
-        W[:,c] = W_temp
-    return W
-def optimization2(init_W,class_number):
-    print('Training coordinate descent initiate from result of linear svm using cos similarity')
-    #original optimization method
-    W = np.empty((len(init_W[:,0]),class_number))
-    for c in range(class_number):
-        W_temp = np.sign(init_W[:,c])
-        length = len(W_temp)
-        cos_distance = cosine(W_temp,init_W[:,c])
-        loss_new = cos_distance
-        loss_old =  2*loss_new
-        j = 0
-        while loss_old-loss_new  != 0:
-            loss_old = loss_new
-            for i in np.random.choice(length, length, replace=False):
-                if W_temp[i] != 0:
-                    a = copy.deepcopy(W_temp[i])
-                    W_temp[i] = 0
-                    loss1 = cosine(W_temp,init_W[:,c])
-                    W_temp[i] = -a
-                    loss2 = cosine(W_temp, init_W[:,c])
-
-                    if loss1 < loss_new:
-                        loss_new = loss1
-                        W_temp[i] = 0
-                    elif loss2<loss_new:
-                        loss_new = loss2
-                    else:
-                        W_temp[i] = a
-                else:
-                    W_temp[i] = 1
-                    loss1 = cosine(W_temp,init_W[:,c])
-                    W_temp[i] = -1
-                    loss2 = cosine(W_temp, init_W[:,c])
-                    if loss1 < loss_new:
-                        loss_new = loss1
-                        W_temp[i] = 1
-                    elif loss2<loss_new:
-                        loss_new = loss2
-                        W_temp[i] = -1
-                    else:
-                        W_temp[i] = 0
-        W[:,c] = W_temp
-    return W
-
-def predict_acc(x_value,y_temp,test_x,test_y,W):
-    clf2 = LinearSVC(dual = False)
-    clf2.fit(np.dot(x_value, W), y_temp)
-    # print(clf2.score(np.dot(x_value, W), y_temp))
-    acc = clf2.score(np.dot(test_x, W), test_y)
-    return  acc
