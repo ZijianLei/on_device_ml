@@ -184,7 +184,7 @@ class Binarynet:
             acc = self.predict()
             self.plt_test_acc.append(acc)
             self.plt_test_loss.append(self.loss)
-            # print(acc)
+            print(acc)
             # if i!=0 and i%3== 0:
             #     self.lr /= 2
     def predict(self):

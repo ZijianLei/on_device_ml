@@ -20,7 +20,7 @@ class Binarynet:
         self.B = B
         self.PI_value = PI_value
         self.unpermutate =np.argsort(self.PI_value) # used in backporpagation
-        self.S = S/(FLAGS.s*np.sqrt(FLAGS.p * d) ** 3)
+        self.S = S/(FLAGS.s*np.sqrt(FLAGS.p * d) )
         self.dimension = d
         self.class_number = class_number
         self.full_data = None
@@ -33,7 +33,7 @@ class Binarynet:
         self.coefficients_temp = copy.deepcopy(self.coefficients)
         #coeeficients shape is (d_project,class_number)torch.randn((self.dimension*FLAGS.p,self.class_number),requires_grad = True)
         self.loss = None # the objective function
-        self.lr = 1e-1
+        self.lr = 1e-2
         self.epoch = 100
         self.gradient = None
         self.prediction = None
@@ -46,6 +46,7 @@ class Binarynet:
         self.momentum_W = 0
         self.momentum_S = 0
         self.momentum_G = 0
+        self.momentum_B = 0
         self.plt_train_acc = []
         self.plt_test_acc = []
         self.plt_train_loss = []
@@ -64,19 +65,18 @@ class Binarynet:
         for i in range(n * p):
 
             ffht.fht(x_[i])
-        x_ = x_.reshape(n, p * self.dimension)
+        x_ = x_.reshape(n, p * self.dimension)/(np.sqrt(self.dimension) )
         self.x_G = np.take(x_, self.PI_value, axis=1, mode='wrap')
         x_transformed = np.multiply(self.x_G, self.G)
         x_ = np.reshape(x_transformed, (n * p, self.dimension))
         for i in range(n * p):
             ffht.fht(x_[i])
-        self.x_S = x_.reshape(n, p * self.dimension)
+        self.x_S = x_.reshape(n, p * self.dimension)/(np.sqrt(self.dimension) )
         x_= np.multiply(self.x_S, self.S)
 
         # self.x_transfer = np.sign(x_)
         self.x_transfer = copy.deepcopy(x_)
-        # print(np.max(self.x_transfer),np.mean(self.x_transfer),np.min(self.x_transfer))
-        # exit()
+
         x_transfer= np.cos(x_+ FLAGS.b) + FLAGS.t
         '''
         control whether the feature and coefficients are binary
@@ -115,42 +115,47 @@ class Binarynet:
         self.coefficients -= self.update_value()  #updata the W
     def Fastfood_updata(self):
         p = FLAGS.p
-        self.gradient  = np.dot((self.prediction-self.label)/self.original.shape[0],self.wb.T)
+        self.gradient  = np.dot((self.prediction-self.label),self.wb.T)/self.original.shape[0]
         self.gradient = np.multiply(self.gradient,-np.sin(self.x_transfer + FLAGS.b))
         self.gradient = np.array(self.gradient)
 
         S = copy.deepcopy(self.S)
         self.S -= self.update_S()
+
+
         self.gradient= np.multiply(S,self.gradient)  # gradient update after S
 
         self.gradient = self.gradient.reshape(-1,self.dimension)
         for i in range(self.gradient.shape[0]):
             ffht.fht(self.gradient[i])
         # self.gradient = self.gradient/(2**(self.dimension/2))# gradient update after H
-        self.gradient = self.gradient.reshape(-1, p*self.dimension)
+        self.gradient = self.gradient.reshape(-1, p*self.dimension)/(np.sqrt(self.dimension) )
         G = copy.deepcopy(self.G)
         self.G -= self.update_G()
-        # print(np.mean(S),np.mean(G))
+        #
         # self.gradient = np.multiply(G, self.gradient)# gradient update after g
         # np.take(self.gradient, self.unpermutate, axis=1, out=self.gradient) #gradient update after Pi
         # self.gradient = self.gradient.reshape(-1,self.dimension)
         # for i in range(self.gradient.shape[0]):
         #     ffht.fht(self.gradient[i])
-        # self.gradient = self.gradient/(2**(self.dimension/2)) # gradient update after H
-        # self.gradient = self.gradient.reshape(-1, p*self.dimension)
-        # # self.B = np.sign(self.B - self.update_B())
+        # self.gradient = self.gradient.reshape(-1, p*self.dimension)/(np.sqrt(self.dimension) )
+        # self.B = np.sign(self.B - self.update_B())
         # self.gradient = np.multiply(self.B, self.gradient) # gradient updata after B if we have further layer in the deep neural network
     def update_S(self):
-        self.momentum_S = self.momentum*self.momentum_S+self.lr *np.diag(np.dot(self.x_S.T, self.gradient))*1e-4
+        self.momentum_S = self.momentum*self.momentum_S+self.lr *np.diag(np.dot(self.x_S.T, self.gradient))
         return  self.momentum_S
         # return self.lr * np.diag(np.dot(self.x_S,self.gradient))
     def update_G(self):
-        self.momentum_G = self.momentum * self.momentum_G + self.lr * np.diag(np.dot(self.x_G.T, self.gradient))*1e-4
+        self.momentum_G = self.momentum * self.momentum_G + self.lr * np.diag(np.dot(self.x_G.T, self.gradient))
         return self.momentum_G
         # return self.lr * np.diag(np.dot(self.x_G.T, self.gradient))
     def update_B(self):
-        return  self.lr *np.diag(np.dot(self.original.T, self.gradient))
+        self.momentum_B = self.momentum * self.momentum_B + self.lr * np.diag(np.dot(self.original.T, self.gradient))
+        return self.momentum_B
+        # return  self.lr *np.diag(np.dot(self.original.T, self.gradient))
         # return self.lr*np.diag(np.dot(self.original,self.gradient))
+
+
 
 
 
@@ -158,6 +163,7 @@ class Binarynet:
         self.momentum_W = self.momentum *self.momentum_W+self.lr*self.gradient
         return self.momentum_W
     def train(self):
+        print(np.mean(self.S),np.max(self.S),np.min(self.S))
         for i in range(self.epoch):
             self.batch = self.full_data
             self.label = self.full_label
@@ -178,9 +184,8 @@ class Binarynet:
             acc = self.predict()
             self.plt_test_acc.append(acc)
             self.plt_test_loss.append(self.loss)
-
-
-        print(acc)
+        print(np.mean(self.S), np.max(self.S), np.min(self.S))
+            # print(acc)
             # if i!=0 and i%3== 0:
             #     self.lr /= 2
     def predict(self):
@@ -245,7 +250,7 @@ def main(name ):
     BNet.full_label_test = y_temp_test
     BNet.train()
     print('the predict result (adaptive fastfood)', BNet.predict())
-    exit()
+    # exit()
     '''
     the following part is used to plot the loss and accuracy
     '''
@@ -256,7 +261,7 @@ def main(name ):
     test_loss = copy.deepcopy(BNet.plt_test_loss)
     BNet.G = G_0
     BNet.B = B
-    BNet.S = S_0/(FLAGS.s*np.sqrt(FLAGS.p * d) ** 3)
+    BNet.S = S_0/(FLAGS.s*np.sqrt(FLAGS.p * d))
     # BNet.lr = 1e-2
     BNet.plt_test_acc = []
     BNet.plt_train_acc = []
@@ -267,14 +272,14 @@ def main(name ):
     plt.plot(np.arange(len(BNet.plt_test_acc)), BNet.plt_test_acc, label='test_w')
     plt.legend(prop={'size': 15})
     # plt.savefig('%s_%f_acc.jpg' % (name,FLAGS.s))
-    # plt.show()
+    plt.show()
     plt.cla()
     plt.plot(np.arange(len(train_loss[1:])), train_loss[1:], label='train_fastfood')
     plt.plot(np.arange(len(test_loss)), test_loss, label='test_fastfood')
     plt.plot(np.arange(len(BNet.plt_train_loss[1:])), BNet.plt_train_loss[1:], label='train_w')
     plt.plot(np.arange(len(BNet.plt_test_loss)), BNet.plt_test_loss, label='test_w')
     plt.legend(prop={'size': 15})
-    # plt.show()
+    plt.show()
     # plt.savefig('%s_%f_loss.jpg' % (name, FLAGS.s))
     # exit()
 
