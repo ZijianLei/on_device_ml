@@ -51,7 +51,7 @@ class Binarynet:
         self.plt_test_acc = []
         self.plt_train_loss = []
         self.plt_test_loss = []
-
+        self.scaling = 5
     def Forwardpropogation(self):
         p = FLAGS.p
         x_ = self.batch
@@ -88,23 +88,24 @@ class Binarynet:
         '''
         using the sigmoid function we will use the sigmoid activation for the multiclass problem
         '''
-        prediction = 1/(1+np.exp(-x_.dot(self.wb)) )
+        prediction = 1/(1+np.exp(-x_.dot(self.wb)/self.scaling) )
+
         self.prediction = prediction
         self.loss = sklearn.metrics.log_loss(self.label, prediction)
 
-        self.gradient = np.dot(x_.T, prediction - self.label) / x_.shape[0]
+        self.gradient = np.dot(x_.T/self.scaling, prediction - self.label) / x_.shape[0]
         '''
         using the softmax function
         '''
-        # predict_temp = x_.dot(np.sign(self.coefficients))
-        # # predict_temp -= np.max(predict_temp)
-        # prediction = scipy.special.softmax(predict_temp,axis = 1)
+        # prediction = x_.dot(self.wb)/self.scaling
+        # prediction -= np.max(prediction, axis=1).reshape(-1, 1)
+        # prediction =  np.exp(prediction)/ np.sum(np.exp(prediction),axis=1).reshape(-1,1)
+        #
         # self.prediction = prediction
-        # self.loss = -np.sum(np.multiply(self.label,np.log(prediction)))/x_.shape[0]
-        # self.gradient = np.dot(x_.T, prediction - self.label)/x_.shape[0]
-
-        # accuracy = sklearn.metrics.accuracy_score(np.argmax(self.prediction, axis=1), np.argmax(self.label, axis=1))
-
+        # # print(self.label[0],prediction[0])
+        # self.loss  = -np.sum(np.multiply(self.label,np.log(self.prediction)))/x_.shape[0]
+        # # self.gradient = np.sum(self.prediction-self.label,axis=0)/ x_.shape[0]
+        # self.gradient = np.dot(x_.T/self.scaling, prediction - self.label) / x_.shape[0]
 
     def STE_layer(self):
         return np.multiply(self.gradient,np.where(abs(self.coefficients)<=1,1,0))
@@ -115,7 +116,14 @@ class Binarynet:
         self.coefficients -= self.update_value()  #updata the W
     def Fastfood_updata(self):
         p = FLAGS.p
-        self.gradient  = np.dot((self.prediction-self.label),self.wb.T)/self.original.shape[0]
+        '''
+        using the sigmoid 
+        '''
+        self.gradient  = np.dot((self.prediction-self.label),self.wb.T/self.scaling)/self.original.shape[0]
+        '''
+        using the softmax
+        '''
+
         self.gradient = np.multiply(self.gradient,-np.sin(self.x_transfer + FLAGS.b))
         self.gradient = np.array(self.gradient)
 
@@ -155,15 +163,11 @@ class Binarynet:
         # return  self.lr *np.diag(np.dot(self.original.T, self.gradient))
         # return self.lr*np.diag(np.dot(self.original,self.gradient))
 
-
-
-
-
     def update_value(self):
         self.momentum_W = self.momentum *self.momentum_W+self.lr*self.gradient
         return self.momentum_W
     def train(self):
-        print(np.mean(self.S),np.max(self.S),np.min(self.S))
+        # print(np.mean(self.S),np.max(self.S),np.min(self.S))
         for i in range(self.epoch):
             self.batch = self.full_data
             self.label = self.full_label
@@ -182,9 +186,10 @@ class Binarynet:
             self.label = self.full_label_test
             self.batch = self.full_data_test
             acc = self.predict()
+            # print(acc)
             self.plt_test_acc.append(acc)
             self.plt_test_loss.append(self.loss)
-        print(np.mean(self.S), np.max(self.S), np.min(self.S))
+        # print(np.mean(self.S), np.max(self.S), np.min(self.S))
             # print(acc)
             # if i!=0 and i%3== 0:
             #     self.lr /= 2
@@ -192,7 +197,7 @@ class Binarynet:
         # self.batch = self.full_data
         # self.label = self.full_label
         self.Forwardpropogation()
-
+        # print(self.prediction[:1])
         # print(self.label)
         # print(np.argmax(self.prediction, axis=1)[:100], np.argmax(self.label, axis=1)[:100])
         accuracy = sklearn.metrics.accuracy_score(np.argmax(self.prediction,axis = 1), np.argmax(self.label,axis = 1))
@@ -251,6 +256,7 @@ def main(name ):
     BNet.train()
     print('the predict result (adaptive fastfood)', BNet.predict())
     # exit()
+
     '''
     the following part is used to plot the loss and accuracy
     '''

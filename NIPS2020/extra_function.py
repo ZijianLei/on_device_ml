@@ -143,7 +143,7 @@ def hadamard(d,f_num,batch,G,B,PI_value,S,FLAGS,sigma = 1):
         # print(np.any(FLAGS.b))
         if np.any(FLAGS.b) :
             # print(1)
-            x_value = x_value / (sigma *T* d)
+            x_value = x_value / (sigma *np.sqrt(d)**3)
             x_value = np.cos(x_value+FLAGS.b)+FLAGS.t
         # print(time.time()-start)
         x_value = np.sign(x_value)
@@ -172,7 +172,7 @@ def hadamard2(d,f_num,batch,G,B,PI_value,S,FLAGS,sigma = 1):
     x_ = x_.reshape(n, p * d)
     x_value = np.multiply(x_, S)
 
-    x_value = x_value / (sigma * (np.sqrt(p * d) ** 3))
+    x_value = x_value / (sigma * (np.sqrt(d) ** 3))
     x_value = np.cos(x_value + FLAGS.b) + FLAGS.t
     x_value = np.sign(x_value)
     return x_value
@@ -428,7 +428,7 @@ def compare_init_optimization(x_value,y_temp,W,class_number,lamda = 0):
         loss_old =  2*loss_new
         j = 0
         loss_result.append(loss_new)
-        while loss_old!=loss_new:
+        while (loss_old - loss_new) / loss_old >= 1e-6:
             loss_old = loss_new
             # for i in np.random.choice(project_d, project_d, replace=False):
             for i in range(project_d):

@@ -4,6 +4,7 @@ import ffht
 import math
 import time
 from sklearn.metrics import *
+from sklearn import preprocessing
 from sklearn.datasets import load_svmlight_file
 from sklearn.svm import  LinearSVC,SVC
 from sklearn.model_selection import  train_test_split
@@ -39,9 +40,13 @@ def get_data(name,FLAGS):
             x_test,y_test = load_svmlight_file("../svm/BudgetedSVM/original/%s/%s" % (name, 'test'))
         x_train = x_train.todense()
         x_test = x_test.todense()
-    move = np.max(x_train)+np.min(x_train)
-    x_train = 2*x_train-move
-    x_test = 2*x_test-move
+    # move = np.max(x_train)+np.min(x_train)
+    # x_train = 2*x_train-move
+    # x_test = 2*x_test-move
+    scaler = preprocessing.StandardScaler(with_std=False).fit(x_train)
+    x_train = scaler.transform(x_train)
+    x_test = scaler.transform(x_test)
+    print(np.max(x_train), np.min(x_train), np.mean(x_train))
     return x_train,y_train,x_test,y_test
 
 
